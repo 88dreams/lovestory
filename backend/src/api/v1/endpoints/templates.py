@@ -22,7 +22,39 @@ async def create_template(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin_user)  # Only admins can create templates
 ):
-    """Create a new story template"""
+    """
+    Create a new story template.
+    
+    Admin only endpoint for creating story templates that users can use to create their stories.
+    
+    Args:
+        * **title**: Required. Template title (3-100 characters)
+        * **description**: Required. Template description
+        * **category**: Required. Template category (e.g., "wedding", "anniversary")
+        * **duration**: Required. Estimated duration in seconds
+        * **steps**: Required. List of template steps, each containing:
+            - title: Step title
+            - description: Step description
+            - duration: Step duration in seconds
+            - required: Whether the step is required
+            - position: Step order position
+    
+    Returns:
+        Complete template object including:
+        * **id**: Template ID
+        * **title**: Template title
+        * **description**: Template description
+        * **category**: Template category
+        * **duration**: Total duration
+        * **created_at**: Creation timestamp
+        * **updated_at**: Last update timestamp
+        * **steps**: List of template steps
+    
+    Raises:
+        * **401**: Not authenticated
+        * **403**: Not an admin
+        * **422**: Validation error
+    """
     template_service = TemplateService(db)
     return await template_service.create_template(template)
 
@@ -34,7 +66,30 @@ async def list_templates(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user)
 ):
-    """List story templates with pagination"""
+    """
+    List available story templates.
+    
+    Retrieves a paginated list of story templates, optionally filtered by category.
+    
+    Args:
+        * **category**: Optional. Filter templates by category
+        * **skip**: Optional. Number of templates to skip (default: 0)
+        * **limit**: Optional. Maximum number of templates to return (default: 100)
+    
+    Returns:
+        List of template objects, each containing:
+        * **id**: Template ID
+        * **title**: Template title
+        * **description**: Template description
+        * **category**: Template category
+        * **duration**: Total duration
+        * **created_at**: Creation timestamp
+        * **updated_at**: Last update timestamp
+        * **steps**: List of template steps
+    
+    Raises:
+        * **422**: Invalid pagination parameters
+    """
     template_service = TemplateService(db)
     templates = await template_service.list_templates(skip, limit, active_only)
     total = len(templates)  # In a real app, you'd want to do a separate count query
@@ -51,7 +106,29 @@ async def get_template(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user)
 ):
-    """Get a specific story template"""
+    """
+    Get a specific story template.
+    
+    Retrieves detailed information about a story template by its ID.
+    
+    Args:
+        * **template_id**: Required. ID of the template to retrieve
+    
+    Returns:
+        Complete template object including:
+        * **id**: Template ID
+        * **title**: Template title
+        * **description**: Template description
+        * **category**: Template category
+        * **duration**: Total duration
+        * **created_at**: Creation timestamp
+        * **updated_at**: Last update timestamp
+        * **steps**: List of template steps
+    
+    Raises:
+        * **404**: Template not found
+        * **422**: Invalid template ID
+    """
     template_service = TemplateService(db)
     template = await template_service.get_template(template_id)
     if not template:
@@ -68,7 +145,36 @@ async def update_template(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin_user)  # Only admins can update templates
 ):
-    """Update a story template"""
+    """
+    Update a story template.
+    
+    Admin only endpoint for updating an existing story template.
+    
+    Args:
+        * **template_id**: Required. ID of the template to update
+        * **title**: Optional. New template title
+        * **description**: Optional. New template description
+        * **category**: Optional. New template category
+        * **duration**: Optional. New estimated duration
+        * **is_active**: Optional. Whether the template is active
+    
+    Returns:
+        Updated template object including:
+        * **id**: Template ID
+        * **title**: Template title
+        * **description**: Template description
+        * **category**: Template category
+        * **duration**: Total duration
+        * **created_at**: Creation timestamp
+        * **updated_at**: Last update timestamp
+        * **steps**: List of template steps
+    
+    Raises:
+        * **401**: Not authenticated
+        * **403**: Not an admin
+        * **404**: Template not found
+        * **422**: Validation error
+    """
     template_service = TemplateService(db)
     return await template_service.update_template(template_id, template_update)
 
@@ -78,7 +184,23 @@ async def delete_template(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin_user)  # Only admins can delete templates
 ):
-    """Delete a story template"""
+    """
+    Delete a story template.
+    
+    Admin only endpoint for deleting a story template.
+    
+    Args:
+        * **template_id**: Required. ID of the template to delete
+    
+    Returns:
+        * **status**: "success" if deletion was successful
+    
+    Raises:
+        * **401**: Not authenticated
+        * **403**: Not an admin
+        * **404**: Template not found
+        * **422**: Invalid template ID
+    """
     template_service = TemplateService(db)
     await template_service.delete_template(template_id)
     return None
@@ -108,7 +230,37 @@ async def update_template_step(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin_user)  # Only admins can update steps
 ):
-    """Update a specific step in a template"""
+    """
+    Update a template step.
+    
+    Admin only endpoint for updating an existing template step.
+    
+    Args:
+        * **template_id**: Required. ID of the template
+        * **step_id**: Required. ID of the step to update
+        * **title**: Optional. New step title
+        * **description**: Optional. New step description
+        * **duration**: Optional. New step duration
+        * **required**: Optional. Whether the step is required
+        * **position**: Optional. New step position
+    
+    Returns:
+        Updated step object including:
+        * **id**: Step ID
+        * **template_id**: Template ID
+        * **title**: Step title
+        * **description**: Step description
+        * **duration**: Step duration
+        * **required**: Whether step is required
+        * **position**: Step position
+        * **created_at**: Creation timestamp
+    
+    Raises:
+        * **401**: Not authenticated
+        * **403**: Not an admin
+        * **404**: Template or step not found
+        * **422**: Validation error
+    """
     template_service = TemplateService(db)
     
     # Verify template exists

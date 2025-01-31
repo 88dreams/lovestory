@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+"""Video management endpoints"""
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Optional
 import tempfile
@@ -9,10 +10,13 @@ from schemas.video import (
     PresignedUrlRequest,
     PresignedUrlResponse,
     VideoMetadata,
-    VideoUploadComplete
+    VideoUploadComplete,
+    VideoSegment,
+    VideoSegmentUpdate
 )
 from services.storage import StorageService
 from services.video import VideoService
+from services.s3 import S3Service
 
 router = APIRouter()
 storage_service = StorageService()
@@ -22,104 +26,96 @@ async def get_upload_url(
     request: PresignedUrlRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
-):
-    """Get a presigned URL for uploading a video"""
-    if not request.content_type.startswith('video/'):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only video files are allowed"
-        )
-
-    # Generate a unique object key using user ID and timestamp
-    object_key = f"videos/user_{current_user.id}/{request.filename}"
+) -> PresignedUrlResponse:
+    """
+    Get a presigned URL for video upload.
     
-    # Generate presigned URL for upload
-    upload_url, final_key = await storage_service.generate_presigned_url(
-        object_key=object_key,
-        expiration=3600,  # 1 hour
-        operation='put_object'
-    )
+    Generates a presigned URL that can be used to upload a video file directly to S3.
+    
+    Args:
+        * **filename**: Required. Original filename of the video
+        * **content_type**: Required. MIME type of the video (must be a valid video type)
+    
+    Returns:
+        * **upload_url**: Presigned URL for uploading the video
+        * **download_url**: URL for downloading the video once uploaded
+        * **object_key**: Unique identifier for the video in storage
+        * **expires_in**: Number of seconds until the upload URL expires
+    
+    Raises:
+        * **400**: Invalid content type
+        * **401**: Not authenticated
+        * **422**: Validation error
+    """
+    s3_service = S3Service()
+    return await s3_service.generate_presigned_url(request, current_user.id)
 
-    # Generate a presigned URL for viewing (optional)
-    download_url = await storage_service.get_download_url(final_key)
-
-    return PresignedUrlResponse(
-        upload_url=upload_url,
-        download_url=download_url,
-        object_key=final_key,
-        expires_in=3600
-    )
-
-@router.post("/complete-upload")
+@router.post("/complete-upload", response_model=VideoSegment)
 async def complete_upload(
-    upload_info: VideoUploadComplete,
-    step_id: int,
+    upload_data: VideoUploadComplete,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
-):
+) -> VideoSegment:
     """
-    Handle upload completion:
-    1. Verify file exists in S3
-    2. Process video in background
-    3. Create video segment
+    Complete video upload process.
+    
+    Validates the uploaded video and processes it for use in stories.
+    Must be called after successfully uploading a video using the presigned URL.
+    
+    Args:
+        * **object_key**: Required. Object key returned from upload-url endpoint
+        * **success**: Required. Whether the upload was successful
+        * **error_message**: Optional. Error message if upload failed
+    
+    Returns:
+        VideoSegment object containing:
+        * **id**: Unique identifier for the video segment
+        * **user_id**: ID of the user who uploaded the video
+        * **object_key**: S3 object key
+        * **duration**: Video duration in seconds
+        * **size**: File size in bytes
+        * **status**: Processing status
+        * **metadata**: Additional video metadata
+    
+    Raises:
+        * **400**: Invalid video format or failed upload
+        * **401**: Not authenticated
+        * **404**: Video not found in storage
+        * **422**: Validation error
     """
     video_service = VideoService(db)
-
-    # Verify file exists
-    if not await storage_service.check_file_exists(upload_info.object_key):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Uploaded file not found"
-        )
-
-    # Process video in background
-    background_tasks.add_task(
-        video_service.process_video,
-        upload_info.object_key,
-        step_id,
-        current_user.id
-    )
-
-    return {"message": "Video processing started"}
+    return await video_service.process_upload(upload_data, current_user.id, background_tasks)
 
 @router.get("/{object_key}/metadata", response_model=VideoMetadata)
 async def get_video_metadata(
     object_key: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
-):
-    """Get metadata for a video"""
-    # Verify the video exists
-    if not await storage_service.check_file_exists(object_key):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Video not found"
-        )
-
-    # Get basic metadata
-    size = await storage_service.get_file_size(object_key)
-    if not size:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Video not found"
-        )
-
-    # Get video metadata from temporary download
+) -> VideoMetadata:
+    """
+    Get video metadata.
+    
+    Retrieves metadata for a previously uploaded video.
+    
+    Args:
+        * **object_key**: Required. Unique identifier for the video in storage
+    
+    Returns:
+        * **object_key**: S3 object key
+        * **size**: File size in bytes
+        * **content_type**: MIME type of the video
+        * **duration**: Video duration in seconds
+        * **width**: Video width in pixels
+        * **height**: Video height in pixels
+    
+    Raises:
+        * **401**: Not authenticated
+        * **403**: Not authorized to access this video
+        * **404**: Video not found
+    """
     video_service = VideoService(db)
-    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=True) as temp_file:
-        storage_service.s3_client.download_file(
-            storage_service.bucket_name,
-            object_key,
-            temp_file.name
-        )
-        metadata = await video_service.validate_video(temp_file.name)
-
-    return VideoMetadata(
-        object_key=object_key,
-        size=size,
-        **metadata
-    )
+    return await video_service.get_metadata(object_key, current_user.id)
 
 @router.delete("/{object_key}")
 async def delete_video(
@@ -127,23 +123,25 @@ async def delete_video(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete a video and its segment record"""
-    # Verify ownership (videos should be in user's directory)
-    if not object_key.startswith(f"videos/user_{current_user.id}/"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to delete this video"
-        )
-
-    # Delete from S3 and database
+    """
+    Delete a video.
+    
+    Permanently removes a video and its associated data.
+    
+    Args:
+        * **object_key**: Required. Unique identifier for the video in storage
+    
+    Returns:
+        * **status**: "success" if deletion was successful
+    
+    Raises:
+        * **401**: Not authenticated
+        * **403**: Not authorized to delete this video
+        * **404**: Video not found
+    """
     video_service = VideoService(db)
-    segment = db.query(VideoSegment).filter(VideoSegment.storage_path == object_key).first()
-    if segment:
-        await video_service.delete_video_segment(segment.id)
-    else:
-        await storage_service.delete_file(object_key)
-
-    return {"message": "Video deleted successfully"}
+    await video_service.delete_video(object_key, current_user.id)
+    return {"status": "success"}
 
 @router.get("/{object_key}/view-url")
 async def get_video_view_url(
@@ -164,17 +162,31 @@ async def get_video_view_url(
 
 # Admin endpoints
 @router.put("/segments/{segment_id}/approve", dependencies=[Depends(get_current_admin_user)])
-async def approve_video_segment(
+async def approve_segment(
     segment_id: int,
-    is_approved: bool,
-    approval_notes: Optional[str] = None,
+    update: VideoSegmentUpdate,
+    current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
-    """Approve or reject a video segment (admin only)"""
+    """
+    Approve or reject a video segment.
+    
+    Admin only endpoint for moderating uploaded video segments.
+    
+    Args:
+        * **segment_id**: Required. ID of the video segment
+        * **status**: Required. New status ("approved" or "rejected")
+        * **rejection_reason**: Optional. Required if status is "rejected"
+    
+    Returns:
+        * **status**: "success" if update was successful
+    
+    Raises:
+        * **401**: Not authenticated
+        * **403**: Not an admin
+        * **404**: Segment not found
+        * **422**: Invalid status or missing rejection reason
+    """
     video_service = VideoService(db)
-    segment = await video_service.update_video_segment(
-        segment_id,
-        is_approved,
-        approval_notes
-    )
-    return segment 
+    await video_service.update_segment_status(segment_id, update)
+    return {"status": "success"} 

@@ -9,34 +9,70 @@ from api.deps import get_db
 from schemas.token import Token, TokenPair
 from services.user import UserService
 from services.auth import AuthService
+from models.base import User
+from schemas.user import UserCreate
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
-@router.post("/login", response_model=TokenPair)
+@router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
+async def register(
+    user_data: UserCreate,
+    db: Session = Depends(get_db)
+) -> Token:
+    """
+    Register a new user.
+    
+    Creates a new user account and returns access and refresh tokens.
+    
+    Args:
+        * **username**: Required. 3-50 characters, alphanumeric and underscores only
+        * **email**: Required. Valid email address
+        * **password**: Required. Must be at least 8 characters and include:
+            - One uppercase letter
+            - One lowercase letter
+            - One number
+            - One special character
+    
+    Returns:
+        * **access_token**: JWT access token
+        * **refresh_token**: JWT refresh token
+        * **token_type**: Type of token (always "bearer")
+    
+    Raises:
+        * **400**: Email already registered
+        * **422**: Validation error
+    """
+    auth_service = AuthService(db)
+    return await auth_service.register_user(user_data)
+
+@router.post("/login", response_model=Token)
 @limiter.limit("5/minute")  # Limit to 5 login attempts per minute
 async def login(
     request: Request,  # Required for rate limiting
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    """Login user and return access and refresh tokens"""
-    user = await UserService(db).authenticate_user(form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    """
+    Login to get access token.
     
-    access_token, refresh_token = AuthService.create_tokens(
-        data={"sub": str(user.id)}
-    )
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer"
-    }
+    Authenticates user credentials and returns access and refresh tokens.
+    
+    Args:
+        * **username**: Required. Email or username
+        * **password**: Required. Account password
+    
+    Returns:
+        * **access_token**: JWT access token
+        * **refresh_token**: JWT refresh token
+        * **token_type**: Type of token (always "bearer")
+    
+    Raises:
+        * **401**: Invalid credentials
+        * **422**: Validation error
+    """
+    auth_service = AuthService(db)
+    return await auth_service.authenticate_user(form_data.username, form_data.password)
 
 @router.post("/refresh", response_model=Token)
 async def refresh_token(
@@ -44,28 +80,20 @@ async def refresh_token(
     refresh_token: str,
     db: Session = Depends(get_db)
 ):
-    """Create new access token using refresh token"""
-    try:
-        payload = AuthService.verify_refresh_token(refresh_token)
-        user_id = payload.get("sub")
-        user = await UserService(db).get_user(int(user_id))
-        if not user or not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid user or inactive user"
-            )
-        
-        access_token = AuthService.create_access_token(
-            data={"sub": str(user.id)}
-        )
-        return {
-            "access_token": access_token,
-            "token_type": "bearer"
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate refresh token"
-        ) 
+    """
+    Get new access token using refresh token.
+    
+    Args:
+        * **refresh_token**: Required. Valid JWT refresh token
+    
+    Returns:
+        * **access_token**: New JWT access token
+        * **refresh_token**: New JWT refresh token
+        * **token_type**: Type of token (always "bearer")
+    
+    Raises:
+        * **401**: Invalid or expired refresh token
+        * **422**: Validation error
+    """
+    auth_service = AuthService(db)
+    return await auth_service.refresh_tokens(refresh_token) 
