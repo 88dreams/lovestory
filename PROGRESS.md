@@ -15,9 +15,9 @@ p# LoveStory Development Progress
 - [x] Set up database connection and session management
 - [x] Implement user authentication system
 - [x] Create API endpoints for user management
-- [ ] Set up S3 integration for video storage
-- [ ] Implement video upload functionality
-- [ ] Create story template management endpoints
+- [x] Set up S3 integration for video storage
+- [x] Implement video upload functionality
+- [x] Create story template management endpoints
 - [ ] Implement video processing service
 - [ ] Create story generation system
 - [ ] Add API documentation with Swagger/OpenAPI

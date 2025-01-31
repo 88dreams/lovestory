@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, List
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
@@ -29,10 +29,19 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # AWS Settings
-    AWS_ACCESS_KEY_ID: Optional[str] = None
-    AWS_SECRET_ACCESS_KEY: Optional[str] = None
+    AWS_ACCESS_KEY_ID: str
+    AWS_SECRET_ACCESS_KEY: str
     AWS_REGION: str = "us-west-2"
     AWS_BUCKET_NAME: str
+    
+    # S3 Upload Settings
+    MAX_UPLOAD_SIZE: int = 100 * 1024 * 1024  # 100MB
+    ALLOWED_VIDEO_TYPES: List[str] = ["video/mp4", "video/quicktime", "video/x-msvideo"]
+    MAX_VIDEO_DURATION: int = 300  # 5 minutes in seconds
+    UPLOAD_URL_EXPIRE: int = 3600  # 1 hour in seconds
+    
+    # CORS Settings
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
     
     class Config:
         env_file = ".env"
