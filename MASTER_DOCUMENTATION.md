@@ -32,17 +32,62 @@ LoveStory is a mobile application that enables collaborative storytelling throug
    /api
    ├── /v1
    │   ├── /auth           # Authentication endpoints
+   │   │   ├── /register   # New user registration
+   │   │   ├── /login      # User login with rate limiting
+   │   │   └── /refresh    # Token refresh
    │   ├── /users          # User management
    │   ├── /templates      # Story template management
+   │   │   ├── GET /       # List templates with pagination
+   │   │   ├── POST /      # Create template (admin)
+   │   │   ├── GET /{id}   # Get template details
+   │   │   ├── PUT /{id}   # Update template (admin)
+   │   │   └── /steps      # Template step management
    │   ├── /videos         # Video upload and management
+   │   │   ├── /upload-url # Get presigned upload URL
+   │   │   ├── /complete   # Complete upload processing
+   │   │   ├── /metadata   # Get video metadata
+   │   │   └── /segments   # Video segment management
    │   └── /stories        # Story generation and retrieval
    ```
 
 3. **Services Layer**
    - Authentication Service
+     * JWT token generation and validation
+     * Password hashing with bcrypt
+     * Rate limiting for login attempts
    - Video Processing Service
+     * Video validation (format, size, duration)
+     * Metadata extraction
+     * Background processing
    - Story Generation Service
    - Storage Service (S3 Integration)
+     * Presigned URL generation
+     * Video storage management
+     * Access control
+
+### API Documentation
+- **OpenAPI/Swagger Integration**
+  * Interactive API documentation
+  * Request/response examples
+  * Authentication flows
+  * Error responses
+
+### Rate Limiting
+- Login attempts: 5 per minute
+- Video uploads: 10 per hour
+- API calls: 1000 per hour per user
+
+### Error Handling
+- Standardized error responses
+  * HTTP status codes
+  * Detailed error messages
+  * Error codes for machine processing
+- Common error scenarios:
+  * Authentication failures
+  * Resource not found
+  * Validation errors
+  * Rate limit exceeded
+  * Server errors
 
 ### Mobile App Architecture
 
@@ -89,8 +134,24 @@ LoveStory is a mobile application that enables collaborative storytelling throug
 
 ### Authentication
 - JWT-based authentication
-- Secure password hashing
+  * Access tokens (short-lived)
+  * Refresh tokens (long-lived)
+  * Token payload validation
+- Secure password hashing with bcrypt
 - Rate limiting on sensitive endpoints
+  * Login attempts
+  * Token refresh
+  * Password reset
+
+### Video Upload Security
+- Presigned URL approach
+  * Time-limited upload URLs
+  * Content type validation
+  * Size restrictions
+- Post-upload validation
+  * Format verification
+  * Malware scanning
+  * Content validation
 
 ### Data Protection
 - S3 bucket policies
