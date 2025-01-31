@@ -12,9 +12,9 @@ p# LoveStory Development Progress
 - [x] Set up basic FastAPI application structure
 
 ## Phase 2: Backend Core Features
-- [ ] Set up database connection and session management
-- [ ] Implement user authentication system
-- [ ] Create API endpoints for user management
+- [x] Set up database connection and session management
+- [x] Implement user authentication system
+- [x] Create API endpoints for user management
 - [ ] Set up S3 integration for video storage
 - [ ] Implement video upload functionality
 - [ ] Create story template management endpoints

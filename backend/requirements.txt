@@ -12,4 +12,6 @@ moviepy==1.0.3
 pytest==7.4.3
 httpx==0.25.1
 python-magic==0.4.27
-pydantic-settings==2.1.0 
+pydantic-settings==2.1.0
+tenacity==8.2.3
+slowapi==0.1.8 

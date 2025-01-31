@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from api.v1.router import api_router
 from config.settings import settings
+from config.database import verify_database_connection
 
 app = FastAPI(
     title="LoveStory API",
@@ -32,8 +33,22 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint that verifies database connection"""
+    db_healthy = await verify_database_connection()
+    if not db_healthy:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connection failed"
+        )
+    
     return {
         "status": "healthy",
-        "service": "LoveStory API"
-    } 
+        "service": "LoveStory API",
+        "database": "connected"
+    }
+
+@app.on_event("startup")
+async def startup_event():
+    """Verify database connection on startup"""
+    if not await verify_database_connection():
+        raise Exception("Database connection failed during startup") 

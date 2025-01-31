@@ -54,6 +54,13 @@ class User(BaseModel):
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     
+    # Profile fields
+    bio = Column(Text)
+    avatar_url = Column(String(255))
+    display_name = Column(String(50))
+    website = Column(String(200))
+    location = Column(String(100))
+    
     video_segments = relationship("VideoSegment", back_populates="user")
 
 class GeneratedStory(BaseModel):
