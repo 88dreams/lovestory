@@ -21,6 +21,8 @@ interface InputProps extends Omit<TextInputProps, 'style'> {
   labelStyle?: StyleProp<TextStyle>;
   helperStyle?: StyleProp<TextStyle>;
   testID?: string;
+  rightIcon?: React.ReactElement;
+  rightIconTestID?: string;
 }
 
 const createStyles = (theme: Theme) => {
@@ -33,14 +35,19 @@ const createStyles = (theme: Theme) => {
       color: theme.colors.text.primary,
       marginBottom: theme.spacing.xxs,
     },
-    input: {
+    inputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
       borderWidth: 1,
       borderColor: theme.colors.border.medium,
       borderRadius: theme.radius.sm,
+      backgroundColor: theme.colors.background.primary,
+    },
+    input: {
+      flex: 1,
       padding: theme.spacing.sm,
       ...theme.typography.body1,
       color: theme.colors.text.primary,
-      backgroundColor: theme.colors.background.primary,
     },
     inputError: {
       borderColor: theme.colors.error[500],
@@ -59,6 +66,9 @@ const createStyles = (theme: Theme) => {
       backgroundColor: theme.colors.action.disabledBackground,
       borderColor: theme.colors.border.light,
     },
+    rightIcon: {
+      paddingRight: theme.spacing.sm,
+    },
   });
 };
 
@@ -72,16 +82,27 @@ export const Input = React.forwardRef<TextInput, InputProps>(({
   helperStyle,
   editable = true,
   testID,
+  rightIcon,
+  rightIconTestID,
   ...props
 }, ref) => {
   const styles = useThemedStyles(createStyles);
 
-  const inputStyles = [
-    styles.input,
+  const containerStyles = [
+    styles.inputContainer,
     error && styles.inputError,
     !editable && styles.disabled,
+  ];
+
+  const inputStyles = [
+    styles.input,
     inputStyle,
   ];
+
+  const rightIconWithProps = rightIcon && React.cloneElement(rightIcon, {
+    testID: rightIconTestID,
+    style: [styles.rightIcon, rightIcon.props.style],
+  });
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -95,22 +116,23 @@ export const Input = React.forwardRef<TextInput, InputProps>(({
         </Text>
       )}
       
-      <TextInput
-        ref={ref}
-        style={inputStyles}
-        placeholderTextColor={styles.helper.color}
-        editable={editable}
-        accessibilityLabel={label || props.placeholder}
-        accessibilityRole="text"
-        accessibilityState={{
-          disabled: !editable,
-          // React Native doesn't support 'invalid' state,
-          // we'll use error messages for accessibility instead
-        }}
-        testID={testID}
-        nativeID={testID}
-        {...props}
-      />
+      <View style={containerStyles}>
+        <TextInput
+          ref={ref}
+          style={inputStyles}
+          placeholderTextColor={styles.helper.color}
+          editable={editable}
+          accessibilityLabel={label || props.placeholder}
+          accessibilityRole="text"
+          accessibilityState={{
+            disabled: !editable,
+          }}
+          testID={testID}
+          nativeID={testID}
+          {...props}
+        />
+        {rightIconWithProps}
+      </View>
 
       {(error || helper) && (
         <Text

@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, ViewStyle, FlexStyle } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemedStyles } from '../../theme/ThemeProvider';
-import { login, socialAuth } from '../../store/slices/authSlice';
-import { signInWithGoogle, signInWithApple, isAppleSignInAvailable } from '../../services/auth/socialAuth';
+import { loginAsync, socialAuthAsync } from '../../store/slices/authSlice';
+import { isAppleSignInAvailable } from '../../services/auth/socialAuth';
+import { authApi } from '../../services/api/auth';
 import { Screen } from '../../components/common/Screen';
 import { H1, Body1, Body2, Caption } from '../../components/common/Typography';
 import { Button } from '../../components/common/Button';
@@ -15,6 +17,66 @@ import { Divider } from '../../components/common/Divider';
 import { Icon } from '../../components/common/Icon';
 import type { Theme } from '../../theme/types';
 import type { AppDispatch } from '../../store';
+
+interface AuthResponse {
+  token: string;
+  user: {
+    id: number;
+    email: string;
+  };
+}
+
+interface SocialAuthResponse {
+  token: string;
+  provider: 'google' | 'apple';
+}
+
+interface AuthPayload {
+  email?: string;
+  password?: string;
+  token: string;
+  user: {
+    id: number;
+    email: string;
+  };
+}
+
+interface FormProps {
+  style?: ViewStyle;
+  onSubmit?: () => void | Promise<void>;
+  children: React.ReactNode;
+}
+
+interface ButtonProps {
+  testID?: string;
+  children: React.ReactNode;
+  variant?: 'text' | 'outlined' | 'contained';
+  onPress: () => void | Promise<void>;
+  disabled?: boolean;
+  loading?: boolean;
+  loadingTestID?: string;
+  iconName?: string;
+}
+
+interface InputProps {
+  testID?: string;
+  label: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  secureTextEntry?: boolean;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  autoComplete?: string;
+  editable?: boolean;
+  rightIcon?: React.ReactNode;
+  keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
+  rightIconTestID?: string;
+}
+
+interface DividerProps {
+  children: React.ReactNode;
+}
+
+const AUTH_TOKEN_KEY = '@auth_token';
 
 const createStyles = (theme: Theme) => ({
   container: {
@@ -63,20 +125,56 @@ export const LoginScreen = () => {
   const styles = useThemedStyles(createStyles);
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation();
-  const [loading, setLoading] = React.useState(false);
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
-  const [formData, setFormData] = React.useState({
-    email: '',
-    password: '',
-  });
+  const [loading, setLoading] = React.useState(false);
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [isAppleAvailable, setIsAppleAvailable] = React.useState(false);
+
+  const isValidPassword = (password: string) => password.length >= 6;
+  const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  useEffect(() => {
+    checkStoredToken();
+    checkAppleSignIn();
+  }, []);
+
+  const checkStoredToken = async () => {
+    try {
+      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+      if (token) {
+        const response = await authApi.validateToken(token);
+        if (response.valid && response.user) {
+          await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
+          navigation.navigate('Home' as never);
+        } else {
+          await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
+        }
+      }
+    } catch (err) {
+      console.error('Token validation failed:', err);
+    }
+  };
+
+  const checkAppleSignIn = async () => {
+    try {
+      const available = await isAppleSignInAvailable();
+      setIsAppleAvailable(available);
+    } catch {
+      setIsAppleAvailable(false);
+    }
+  };
 
   const handleLogin = async () => {
     try {
-      setLoading(true);
       setError(null);
-      await dispatch(login(formData)).unwrap();
+      setLoading(true);
+      const result = await dispatch(loginAsync({ email, password })).unwrap();
+      await AsyncStorage.setItem(AUTH_TOKEN_KEY, result.token);
+      navigation.navigate('Home' as never);
     } catch (err) {
-      setError(typeof err === 'string' ? err : 'Failed to login');
+      setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -84,192 +182,115 @@ export const LoginScreen = () => {
 
   const handleSocialAuth = async (provider: 'google' | 'apple') => {
     try {
-      setLoading(true);
       setError(null);
-
-      let socialAuthResponse;
-      if (provider === 'google') {
-        socialAuthResponse = await signInWithGoogle();
-      } else {
-        // Check if Apple Sign In is available on the device
-        const isAppleAvailable = await isAppleSignInAvailable();
-        if (!isAppleAvailable) {
-          setError('Apple Sign In is not available on this device');
-          return;
-        }
-        socialAuthResponse = await signInWithApple();
-      }
-
-      // Handle the social auth response
-      await dispatch(socialAuth(socialAuthResponse)).unwrap();
+      setLoading(true);
+      const result = await dispatch(socialAuthAsync(provider)).unwrap();
+      await AsyncStorage.setItem(AUTH_TOKEN_KEY, result.token);
+      navigation.navigate('Home' as never);
     } catch (err) {
-      setError(typeof err === 'string' ? err : 'Failed to authenticate with social provider');
+      setError(err instanceof Error ? err.message : `${provider} authentication failed`);
     } finally {
       setLoading(false);
     }
   };
 
-  const navigateToRegister = () => {
-    navigation.navigate('Register' as never);
-  };
-
-  const navigateToForgotPassword = () => {
-    navigation.navigate('ForgotPassword' as never);
-  };
-
   return (
-    <Screen>
-      <View style={styles.container} accessible={true} accessibilityRole="none">
-        <View style={styles.header} accessible={true} accessibilityRole="header">
-          <H1 accessibilityRole="header" testID="welcome-text">Welcome Back</H1>
-          <Spacer size="xs" />
-          <Body1 color="textSecondary" accessibilityRole="text" testID="subtitle-text">
-            Sign in to continue
-          </Body1>
-        </View>
+    <Screen style={styles.container}>
+      <View style={styles.header} testID="welcome-header">
+        <H1 testID="welcome-text">Welcome Back</H1>
+        <Body1 testID="subtitle-text">Sign in to continue</Body1>
+      </View>
 
-        <Form style={styles.form} onSubmit={handleLogin}>
-          <Input
-            label="Email"
-            placeholder="Enter your email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-            textContentType="emailAddress"
-            value={formData.email}
-            onChangeText={(text) => {
-              setFormData(prev => ({ ...prev, email: text }));
-              if (error) setError(null);
-            }}
-            accessibilityLabel="Email input field"
-            accessibilityHint="Enter your email address to sign in"
-            accessibilityRole="text"
-            testID="email-input"
-          />
-          <Spacer size="md" />
-          <Input
-            label="Password"
-            placeholder="Enter your password"
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="password"
-            textContentType="password"
-            value={formData.password}
-            onChangeText={(text) => {
-              setFormData(prev => ({ ...prev, password: text }));
-              if (error) setError(null);
-            }}
-            accessibilityLabel="Password input field"
-            accessibilityHint="Enter your password to sign in"
-            accessibilityRole="text"
-            testID="password-input"
-          />
+      <Form style={styles.form} onSubmit={handleLogin}>
+        <Input
+          testID="email-input"
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+          editable={!loading}
+        />
+        <Spacer size="md" />
+        <Input
+          testID="password-input"
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+          autoCapitalize="none"
+          editable={!loading}
+          rightIcon={
+            <Icon
+              name={showPassword ? 'eye-off' : 'eye'}
+              onPress={() => setShowPassword(!showPassword)}
+            />
+          }
+          rightIconTestID="password-visibility-toggle"
+        />
 
-          <Button
-            label="Forgot Password?"
-            variant="text"
-            style={styles.forgotPassword}
-            onPress={navigateToForgotPassword}
-            accessibilityLabel="Forgot password button"
-            accessibilityHint="Navigate to password reset screen"
-            testID="forgot-password-button"
-          />
+        {error && (
+          <View testID="form-error">
+            <Spacer size="sm" />
+            <Caption color="error">{error}</Caption>
+          </View>
+        )}
 
-          <Spacer size="lg" />
-
-          <Button
-            label="Sign In"
-            variant="primary"
-            loading={loading}
-            disabled={loading}
-            onPress={handleLogin}
-            accessibilityLabel={`Sign in button${loading ? ', loading' : ''}`}
-            accessibilityHint="Sign in to your account"
-            testID="sign-in-button"
-          />
-
-          {error && (
-            <>
-              <Spacer size="md" />
-              <Caption 
-                color="error" 
-                accessibilityRole="alert"
-                accessibilityLabel={error}
-              >
-                {error}
-              </Caption>
-            </>
-          )}
-        </Form>
-
-        <View style={styles.dividerContainer} accessible={true} accessibilityRole="none">
-          <Divider />
-          <Body2 
-            color="textSecondary" 
-            style={styles.dividerText}
-            accessibilityRole="text"
-            accessibilityLabel="or"
-          >
-            OR
-          </Body2>
-          <Divider />
-        </View>
+        <Spacer size="lg" />
+        <Button
+          testID="sign-in-button"
+          onPress={handleLogin}
+          loading={loading}
+          disabled={!email || !password || !isValidPassword(password) || !isValidEmail(email) || loading}
+          loadingTestID="sign-in-button-loading"
+        >
+          Sign In
+        </Button>
 
         <Button
-          label="Continue with Google"
+          testID="forgot-password-button"
+          variant="text"
+          onPress={() => navigation.navigate('ForgotPassword' as never)}
+          disabled={loading}
+        >
+          Forgot Password?
+        </Button>
+
+        <Divider>or</Divider>
+
+        <Button
+          testID="google-auth-button"
           variant="outlined"
           onPress={() => handleSocialAuth('google')}
-          accessibilityLabel="Sign in with Google button"
-          accessibilityHint="Sign in using your Google account"
-          testID="google-auth-button"
-          style={styles.socialButton}
-          icon={
-            <Icon 
-              name="google" 
-              size="md" 
-              style={styles.socialIcon}
-              accessibilityLabel="Google icon"
-            />
-          }
-        />
+          disabled={loading}
+          iconName="google"
+        >
+          Continue with Google
+        </Button>
 
-        <Spacer size="md" />
-
-        <Button
-          label="Continue with Apple"
-          variant="outlined"
-          onPress={() => handleSocialAuth('apple')}
-          accessibilityLabel="Sign in with Apple button"
-          accessibilityHint="Sign in using your Apple account"
-          testID="apple-auth-button"
-          style={styles.socialButton}
-          icon={
-            <Icon 
-              name="apple" 
-              size="md" 
-              style={styles.socialIcon}
-              accessibilityLabel="Apple icon"
-            />
-          }
-        />
-
-        <View style={styles.footer} accessible={true} accessibilityRole="none">
-          <Body2 
-            color="textSecondary"
-            accessibilityRole="text"
-          >
-            Don't have an account?{' '}
-          </Body2>
+        {isAppleAvailable && (
           <Button
-            label="Sign Up"
-            variant="text"
-            onPress={navigateToRegister}
-            accessibilityLabel="Sign up button"
-            accessibilityHint="Navigate to create account screen"
-            testID="sign-up-button"
-          />
-        </View>
-      </View>
+            testID="apple-auth-button"
+            variant="outlined"
+            onPress={() => handleSocialAuth('apple')}
+            disabled={loading}
+            iconName="apple"
+          >
+            Continue with Apple
+          </Button>
+        )}
+
+        <Spacer size="xl" />
+        <Button
+          testID="sign-up-button"
+          variant="text"
+          onPress={() => navigation.navigate('Register' as never)}
+          disabled={loading}
+        >
+          Don't have an account? Sign Up
+        </Button>
+      </Form>
     </Screen>
   );
 }; 

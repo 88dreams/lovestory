@@ -1,7 +1,8 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { authService, ApiResponse, AuthData } from '../../services/auth/authService';
 import type { SocialAuthResponse } from '../../services/auth/socialAuth';
+import { authApi } from '../../services/api/auth';
+import { signInWithGoogle, signInWithApple } from '../../services/auth/socialAuth';
 
 // Types
 export type User = {
@@ -18,6 +19,7 @@ export type AuthState = {
   isLoading: boolean;
   error: string | null;
   isInitialized: boolean;
+  isAuthenticated: boolean;
 };
 
 interface LoginCredentials {
@@ -36,6 +38,23 @@ interface ResetPasswordData {
   password: string;
 }
 
+interface AuthPayload {
+  email?: string;
+  password?: string;
+  token: string;
+  user: User;
+}
+
+interface AuthResponse {
+  token: string;
+  user: User;
+}
+
+interface SocialAuthPayload {
+  token: string;
+  provider: 'google' | 'apple';
+}
+
 // Initial state
 const initialState: AuthState = {
   user: null,
@@ -43,6 +62,7 @@ const initialState: AuthState = {
   isLoading: false,
   error: null,
   isInitialized: false,
+  isAuthenticated: false,
 };
 
 // Async thunks
@@ -58,18 +78,11 @@ export const initialize = createAsyncThunk(
   }
 );
 
-export const login = createAsyncThunk(
-  'auth/login',
-  async (credentials: { email: string; password: string }, { rejectWithValue }) => {
-    try {
-      const response = await authService.login(credentials);
-      if (response.type === 'error' || !response.data) {
-        return rejectWithValue(response.message || 'Login failed');
-      }
-      return response.data;
-    } catch (error) {
-      return rejectWithValue('Login failed');
-    }
+export const loginAsync = createAsyncThunk(
+  'auth/loginAsync',
+  async (credentials: LoginCredentials) => {
+    const response = await authApi.login(credentials);
+    return response as AuthResponse;
   }
 );
 
@@ -88,18 +101,15 @@ export const register = createAsyncThunk(
   }
 );
 
-export const socialAuth = createAsyncThunk(
-  'auth/socialAuth',
-  async (data: any, { rejectWithValue }) => {
-    try {
-      const response = await authService.socialAuth(data);
-      if (response.type === 'error' || !response.data) {
-        return rejectWithValue(response.message || 'Social authentication failed');
-      }
-      return response.data;
-    } catch (error) {
-      return rejectWithValue('Social authentication failed');
-    }
+export const socialAuthAsync = createAsyncThunk(
+  'auth/socialAuthAsync',
+  async (provider: 'google' | 'apple') => {
+    const socialResponse = await (provider === 'google' ? signInWithGoogle() : signInWithApple());
+    const response = await authApi.socialAuth({
+      token: socialResponse.token,
+      provider,
+    });
+    return response as AuthResponse;
   }
 );
 
@@ -118,8 +128,8 @@ export const resetPassword = createAsyncThunk(
   }
 );
 
-export const logout = createAsyncThunk(
-  'auth/logout',
+export const logoutAsync = createAsyncThunk(
+  'auth/logoutAsync',
   async () => {
     await authService.logout();
   }
@@ -183,6 +193,21 @@ const authSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    login: (state, action: PayloadAction<AuthPayload>) => {
+      state.isAuthenticated = true;
+      state.token = action.payload.token;
+      state.user = action.payload.user;
+    },
+    socialAuth: (state, action: PayloadAction<AuthPayload>) => {
+      state.isAuthenticated = true;
+      state.token = action.payload.token;
+      state.user = action.payload.user;
+    },
+    logout: (state) => {
+      state.isAuthenticated = false;
+      state.token = null;
+      state.user = null;
+    },
   },
   extraReducers: (builder) => {
     // Initialize auth
@@ -201,19 +226,22 @@ const authSlice = createSlice({
     });
 
     // Login
-    builder.addCase(login.pending, (state) => {
-      state.isLoading = true;
-      state.error = null;
-    });
-    builder.addCase(login.fulfilled, (state, action) => {
-      state.isLoading = false;
-      state.user = action.payload.user;
-      state.token = action.payload.token;
-    });
-    builder.addCase(login.rejected, (state, action) => {
-      state.isLoading = false;
-      state.error = action.payload as string;
-    });
+    builder
+      .addCase(loginAsync.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(loginAsync.fulfilled, (state, action) => {
+        state.isAuthenticated = true;
+        state.token = action.payload.token;
+        state.user = action.payload.user;
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(loginAsync.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.error.message || 'Login failed';
+      });
 
     // Register
     builder.addCase(register.pending, (state) => {
@@ -231,19 +259,22 @@ const authSlice = createSlice({
     });
 
     // Social auth
-    builder.addCase(socialAuth.pending, (state) => {
-      state.isLoading = true;
-      state.error = null;
-    });
-    builder.addCase(socialAuth.fulfilled, (state, action) => {
-      state.isLoading = false;
-      state.user = action.payload.user;
-      state.token = action.payload.token;
-    });
-    builder.addCase(socialAuth.rejected, (state, action) => {
-      state.isLoading = false;
-      state.error = action.payload as string;
-    });
+    builder
+      .addCase(socialAuthAsync.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(socialAuthAsync.fulfilled, (state, action) => {
+        state.isAuthenticated = true;
+        state.token = action.payload.token;
+        state.user = action.payload.user;
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(socialAuthAsync.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.error.message || 'Social authentication failed';
+      });
 
     // Reset password
     builder.addCase(resetPassword.pending, (state) => {
@@ -259,9 +290,11 @@ const authSlice = createSlice({
     });
 
     // Logout
-    builder.addCase(logout.fulfilled, (state) => {
-      state.user = null;
+    builder.addCase(logoutAsync.fulfilled, (state) => {
+      state.isAuthenticated = false;
       state.token = null;
+      state.user = null;
+      state.error = null;
     });
 
     // Request password reset
@@ -308,5 +341,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { updateUser, clearError } = authSlice.actions;
+export const { updateUser, clearError, login, socialAuth, logout } = authSlice.actions;
 export default authSlice.reducer; 

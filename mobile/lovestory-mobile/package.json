@@ -10,7 +10,10 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage"
+    "test:ci": "jest --ci --coverage",
+    "test:auth": "jest src/test/integration/auth.test.tsx --watch",
+    "test:auth:coverage": "jest src/test/integration/auth.test.tsx --coverage",
+    "test:auth:debug": "jest src/test/integration/auth.test.tsx --watch --verbose"
   },
   "dependencies": {
     "@invertase/react-native-apple-authentication": "^2.4.0",
@@ -52,8 +55,7 @@
   "jest": {
     "preset": "jest-expo",
     "setupFilesAfterEnv": [
-      "<rootDir>/jest.setup.js",
-      "<rootDir>/src/test/setup.ts"
+      "<rootDir>/src/test/setupJest.ts"
     ],
     "transformIgnorePatterns": [
       "node_modules/(?!(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|react-redux)"
