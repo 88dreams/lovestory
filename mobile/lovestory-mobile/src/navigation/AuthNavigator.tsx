@@ -4,48 +4,23 @@ import { LoginScreen } from '../screens/auth/LoginScreen';
 import { RegisterScreen } from '../screens/auth/RegisterScreen';
 import { ForgotPasswordScreen } from '../screens/auth/ForgotPasswordScreen';
 import { ResetPasswordScreen } from '../screens/auth/ResetPasswordScreen';
-
-export type AuthStackParamList = {
-  Login: undefined;
-  Register: undefined;
-  ForgotPassword: undefined;
-  ResetPassword: {
-    token: string;
-  };
-};
+import { EmailVerificationScreen } from '../screens/auth/EmailVerificationScreen';
+import type { AuthStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
-const AuthNavigator = () => {
+export const AuthNavigator = () => {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerShown: true,
-        headerTintColor: '#000',
+        headerShown: false,
       }}
     >
-      <Stack.Screen 
-        name="Login" 
-        component={LoginScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen 
-        name="Register" 
-        component={RegisterScreen}
-        options={{ title: 'Create Account' }}
-      />
-      <Stack.Screen 
-        name="ForgotPassword" 
-        component={ForgotPasswordScreen}
-        options={{ title: 'Reset Password' }}
-      />
-      <Stack.Screen 
-        name="ResetPassword" 
-        component={ResetPasswordScreen}
-        options={{ title: 'Set New Password' }}
-      />
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+      <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} />
     </Stack.Navigator>
   );
-};
-
-export default AuthNavigator; 
+}; 

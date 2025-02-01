@@ -31,6 +31,12 @@ export type NewPasswordData = {
   password: string;
 };
 
+export type EmailVerificationResponse = {
+  type: 'success' | 'error';
+  message: string;
+  isEmailSent?: boolean;
+};
+
 class AuthService {
   private static instance: AuthService;
   private baseUrl: string;
@@ -108,6 +114,7 @@ class AuthService {
       id: '1',
       email: 'user@example.com',
       name: 'Test User',
+      isEmailVerified: false,
     };
   }
 
@@ -192,6 +199,7 @@ class AuthService {
         id: '1',
         email: credentials.email,
         name: 'Test User',
+        isEmailVerified: false,
       },
       token: 'mock_token',
     };
@@ -211,6 +219,7 @@ class AuthService {
         id: '1',
         email: data.email,
         name: data.name,
+        isEmailVerified: false,
       },
       token: 'mock_token',
     };
@@ -263,6 +272,7 @@ class AuthService {
             email: result.user.email,
             name: result.user.name,
             avatar: result.user.avatar,
+            isEmailVerified: result.user.isEmailVerified || false,
           },
           token: result.token,
         },
@@ -279,6 +289,80 @@ class AuthService {
   async logout(): Promise<void> {
     // TODO: Implement actual API call if needed
     await this.setStoredToken(null);
+  }
+
+  /**
+   * Request email verification
+   * Sends a verification email to the user's email address
+   */
+  public async requestEmailVerification(): Promise<EmailVerificationResponse> {
+    try {
+      const token = await this.getToken();
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`${this.baseUrl}/verify-email/request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to send verification email');
+      }
+
+      return {
+        type: 'success',
+        message: 'Verification email sent successfully',
+        isEmailSent: true,
+      };
+    } catch (error) {
+      console.error('Email Verification Request Error:', error);
+      return {
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to send verification email',
+        isEmailSent: false,
+      };
+    }
+  }
+
+  /**
+   * Verify email with token
+   * @param token - The verification token received via email
+   */
+  public async verifyEmail(token: string): Promise<ApiResponse> {
+    try {
+      const response = await fetch(`${this.baseUrl}/verify-email/confirm`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to verify email');
+      }
+
+      return {
+        type: 'success',
+        message: 'Email verified successfully',
+        data: result.user,
+      };
+    } catch (error) {
+      console.error('Email Verification Error:', error);
+      return {
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to verify email',
+      };
+    }
   }
 }
 

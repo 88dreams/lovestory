@@ -9,6 +9,7 @@ export type User = {
   email: string;
   name: string;
   avatar?: string;
+  isEmailVerified: boolean;
 };
 
 export type AuthState = {
@@ -139,6 +140,36 @@ export const requestPasswordReset = createAsyncThunk(
   }
 );
 
+export const requestEmailVerification = createAsyncThunk(
+  'auth/requestEmailVerification',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await authService.requestEmailVerification();
+      if (response.type === 'error' || !response.isEmailSent) {
+        return rejectWithValue(response.message || 'Failed to send verification email');
+      }
+      return true;
+    } catch (error) {
+      return rejectWithValue('Failed to send verification email');
+    }
+  }
+);
+
+export const verifyEmail = createAsyncThunk(
+  'auth/verifyEmail',
+  async (token: string, { rejectWithValue }) => {
+    try {
+      const response = await authService.verifyEmail(token);
+      if (response.type === 'error' || !response.data) {
+        return rejectWithValue(response.message || 'Failed to verify email');
+      }
+      return response.data;
+    } catch (error) {
+      return rejectWithValue('Failed to verify email');
+    }
+  }
+);
+
 // Slice
 const authSlice = createSlice({
   name: 'auth',
@@ -242,6 +273,35 @@ const authSlice = createSlice({
       state.isLoading = false;
     });
     builder.addCase(requestPasswordReset.rejected, (state, action) => {
+      state.isLoading = false;
+      state.error = action.payload as string;
+    });
+
+    // Request email verification
+    builder.addCase(requestEmailVerification.pending, (state) => {
+      state.isLoading = true;
+      state.error = null;
+    });
+    builder.addCase(requestEmailVerification.fulfilled, (state) => {
+      state.isLoading = false;
+    });
+    builder.addCase(requestEmailVerification.rejected, (state, action) => {
+      state.isLoading = false;
+      state.error = action.payload as string;
+    });
+
+    // Verify email
+    builder.addCase(verifyEmail.pending, (state) => {
+      state.isLoading = true;
+      state.error = null;
+    });
+    builder.addCase(verifyEmail.fulfilled, (state, action) => {
+      state.isLoading = false;
+      if (state.user) {
+        state.user = { ...state.user, isEmailVerified: true };
+      }
+    });
+    builder.addCase(verifyEmail.rejected, (state, action) => {
       state.isLoading = false;
       state.error = action.payload as string;
     });

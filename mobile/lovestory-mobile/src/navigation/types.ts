@@ -5,6 +5,7 @@ export type AuthStackParamList = {
   Register: undefined;
   ForgotPassword: undefined;
   ResetPassword: { token: string };
+  EmailVerification: { token?: string };
 };
 
 export type MainStackParamList = {
