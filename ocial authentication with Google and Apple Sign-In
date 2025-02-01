@@ -1,0 +1,19 @@
+warning: in the working copy of 'docs/TECHNICAL_SPECS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/lovestory-mobile/.gitignore', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/lovestory-mobile/App.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/lovestory-mobile/app.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/lovestory-mobile/package-lock.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/lovestory-mobile/package.json', LF will be replaced by CRLF the next time Git touches it
+DEV_ENV.md
+MASTER_DOCUMENTATION.md
+PROGRESS.md
+README.md
+docs/PROGRESS.md
+docs/TECHNICAL_SPECS.md
+mobile/lovestory-mobile/.gitignore
+mobile/lovestory-mobile/App.tsx
+mobile/lovestory-mobile/app.json
+mobile/lovestory-mobile/package-lock.json
+mobile/lovestory-mobile/package.json
+mobile/lovestory-mobile/src/navigation/AuthNavigator.tsx
+mobile/lovestory-mobile/src/navigation/RootNavigator.tsx
