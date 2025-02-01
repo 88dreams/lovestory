@@ -2,6 +2,8 @@ import React from 'react';
 import { render, cleanup } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
+import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from '../theme/ThemeProvider';
 import type { RootState } from '../store';
 import type { AuthState } from '../store/slices/authSlice';
@@ -105,20 +107,22 @@ export function renderWithProviders(
   function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <Provider store={store}>
-        <ThemeProvider>
-          {children}
-        </ThemeProvider>
+        <NavigationContainer>
+          <SafeAreaProvider>
+            <ThemeProvider>
+              {children}
+            </ThemeProvider>
+          </SafeAreaProvider>
+        </NavigationContainer>
       </Provider>
     );
   }
 
-  const result = render(ui, {
-    wrapper: Wrapper,
-    ...renderOptions,
-  });
-
   return {
     store,
-    ...result,
+    ...render(ui, {
+      wrapper: Wrapper,
+      ...renderOptions,
+    }),
   };
 }

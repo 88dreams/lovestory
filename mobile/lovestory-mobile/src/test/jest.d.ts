@@ -31,9 +31,15 @@ declare global {
 declare module '@testing-library/react-native' {
   interface RenderResult {
     store: Store;
-    rerender: (ui: React.ReactElement) => void;
-    unmount: () => void;
-    container: Element;
+  }
+
+  interface Queries {
+    getByTestId(id: string): any;
+    queryByTestId(id: string): any | null;
+    findByTestId(id: string): Promise<any>;
+    getAllByTestId(id: string): any[];
+    queryAllByTestId(id: string): any[];
+    findAllByTestId(id: string): Promise<any[]>;
   }
 }
 
@@ -65,18 +71,6 @@ export interface TestElement extends HTMLElement {
     editable?: boolean;
     secureTextEntry?: boolean;
   };
-}
-
-// Extend the query types
-declare module '@testing-library/react-native' {
-  interface Queries {
-    getByTestId(id: string): TestElement;
-    queryByTestId(id: string): TestElement | null;
-    findByTestId(id: string): Promise<TestElement>;
-    getAllByTestId(id: string): TestElement[];
-    queryAllByTestId(id: string): TestElement[];
-    findAllByTestId(id: string): Promise<TestElement[]>;
-  }
 }
 
 export {}; 

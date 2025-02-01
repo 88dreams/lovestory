@@ -65,6 +65,15 @@ const initialState: AuthState = {
   isAuthenticated: false,
 };
 
+// Helper function to transform API user to our User type
+const transformUser = (apiUser: any): User => ({
+  id: apiUser.id,
+  email: apiUser.email,
+  name: apiUser.name || apiUser.email.split('@')[0],
+  avatar: apiUser.photoUrl || apiUser.avatar,
+  isEmailVerified: apiUser.isEmailVerified || false,
+});
+
 // Async thunks
 export const initialize = createAsyncThunk(
   'auth/initialize',
@@ -74,15 +83,25 @@ export const initialize = createAsyncThunk(
       return { user: null, token: null };
     }
     const user = await authService.getCurrentUser();
-    return { user, token };
+    return { user: user ? transformUser(user) : null, token };
   }
 );
 
 export const loginAsync = createAsyncThunk(
   'auth/loginAsync',
-  async (credentials: LoginCredentials) => {
-    const response = await authApi.login(credentials);
-    return response as AuthResponse;
+  async (credentials: LoginCredentials, { rejectWithValue }) => {
+    try {
+      const response = await authApi.login(credentials);
+      if (!response?.token || !response?.user) {
+        return rejectWithValue('Invalid response from server');
+      }
+      return {
+        token: response.token,
+        user: transformUser(response.user),
+      };
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Login failed');
+    }
   }
 );
 
@@ -94,7 +113,10 @@ export const register = createAsyncThunk(
       if (response.type === 'error' || !response.data) {
         return rejectWithValue(response.message || 'Registration failed');
       }
-      return response.data;
+      return {
+        token: response.data.token,
+        user: transformUser(response.data.user)
+      };
     } catch (error) {
       return rejectWithValue('Registration failed');
     }
@@ -103,13 +125,30 @@ export const register = createAsyncThunk(
 
 export const socialAuthAsync = createAsyncThunk(
   'auth/socialAuthAsync',
-  async (provider: 'google' | 'apple') => {
-    const socialResponse = await (provider === 'google' ? signInWithGoogle() : signInWithApple());
-    const response = await authApi.socialAuth({
-      token: socialResponse.token,
-      provider,
-    });
-    return response as AuthResponse;
+  async (provider: 'google' | 'apple', { rejectWithValue }) => {
+    try {
+      const socialResponse = await (provider === 'google' ? signInWithGoogle() : signInWithApple());
+      
+      if (socialResponse.type === 'error' || !socialResponse.data) {
+        return rejectWithValue(socialResponse.message || `Failed to sign in with ${provider}`);
+      }
+
+      const response = await authApi.socialAuth({
+        token: socialResponse.data.id, // Using id as token since that's what we get from social auth
+        provider,
+      });
+
+      if (!response?.token || !response?.user) {
+        return rejectWithValue('Invalid response from server');
+      }
+
+      return {
+        token: response.token,
+        user: transformUser(response.user),
+      };
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : `Failed to sign in with ${provider}`);
+    }
   }
 );
 
@@ -173,7 +212,10 @@ export const verifyEmail = createAsyncThunk(
       if (response.type === 'error' || !response.data) {
         return rejectWithValue(response.message || 'Failed to verify email');
       }
-      return response.data;
+      return {
+        token: response.data.token,
+        user: transformUser(response.data.user)
+      };
     } catch (error) {
       return rejectWithValue('Failed to verify email');
     }
@@ -196,12 +238,12 @@ const authSlice = createSlice({
     login: (state, action: PayloadAction<AuthPayload>) => {
       state.isAuthenticated = true;
       state.token = action.payload.token;
-      state.user = action.payload.user;
+      state.user = transformUser(action.payload.user);
     },
     socialAuth: (state, action: PayloadAction<AuthPayload>) => {
       state.isAuthenticated = true;
       state.token = action.payload.token;
-      state.user = action.payload.user;
+      state.user = transformUser(action.payload.user);
     },
     logout: (state) => {
       state.isAuthenticated = false;
@@ -219,6 +261,7 @@ const authSlice = createSlice({
       state.isInitialized = true;
       state.user = action.payload.user;
       state.token = action.payload.token;
+      state.isAuthenticated = !!action.payload.token;
     });
     builder.addCase(initialize.rejected, (state) => {
       state.isLoading = false;
@@ -250,6 +293,7 @@ const authSlice = createSlice({
     });
     builder.addCase(register.fulfilled, (state, action) => {
       state.isLoading = false;
+      state.isAuthenticated = true;
       state.user = action.payload.user;
       state.token = action.payload.token;
     });

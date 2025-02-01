@@ -12,22 +12,30 @@
       "@utils/*": ["src/utils/*"],
       "@test/*": ["src/test/*"]
     },
-    "types": ["jest", "node"],
-    "typeRoots": ["./node_modules/@types", "./src/test"],
+    "types": ["jest"],
+    "typeRoots": ["./node_modules/@types"],
     "esModuleInterop": true,
     "jsx": "react-native",
     "lib": ["dom", "esnext"],
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "noEmit": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "allowJs": true
+    "allowJs": true,
+    "module": "esnext",
+    "target": "esnext"
   },
   "include": [
     "src/**/*",
     "**/*.test.ts",
     "**/*.test.tsx",
-    "src/test/jest.d.ts"
+    "src/test/jest.d.ts",
+    "node_modules/@types",
+    "node_modules/@testing-library/jest-native",
+    "node_modules/@testing-library/react-native",
+    "node_modules/@react-navigation/native",
+    "node_modules/@reduxjs/toolkit"
   ],
   "exclude": [
     "node_modules",

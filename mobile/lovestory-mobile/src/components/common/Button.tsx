@@ -16,7 +16,7 @@ type ButtonSize = 'small' | 'medium' | 'large';
 
 interface ButtonProps {
   onPress: () => void;
-  label: string;
+  children: React.ReactNode;
   variant?: ButtonVariant;
   size?: ButtonSize;
   disabled?: boolean;
@@ -124,7 +124,7 @@ const createStyles = (theme: Theme) => {
 
 export const Button: React.FC<ButtonProps> = ({
   onPress,
-  label,
+  children,
   variant = 'primary',
   size = 'medium',
   disabled = false,
@@ -155,6 +155,8 @@ export const Button: React.FC<ButtonProps> = ({
     labelStyle,
   ];
 
+  const loadingTestID = loading ? `${testID}-loading` : testID;
+
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -162,13 +164,13 @@ export const Button: React.FC<ButtonProps> = ({
       disabled={disabled || loading}
       accessible={true}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel || label}
+      accessibilityLabel={accessibilityLabel || (typeof children === 'string' ? children : undefined)}
       accessibilityHint={accessibilityHint}
       accessibilityState={{
-        disabled,
+        disabled: disabled || loading,
         busy: loading,
       }}
-      testID={testID}
+      testID={loadingTestID}
     >
       {loading ? (
         <ActivityIndicator
@@ -181,7 +183,11 @@ export const Button: React.FC<ButtonProps> = ({
       ) : (
         <>
           {icon}
-          <Text style={textStyles}>{label}</Text>
+          {typeof children === 'string' ? (
+            <Text style={textStyles}>{children}</Text>
+          ) : (
+            children
+          )}
         </>
       )}
     </TouchableOpacity>

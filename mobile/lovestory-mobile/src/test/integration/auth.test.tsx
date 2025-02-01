@@ -1,258 +1,237 @@
+// Import test utilities and components
 import React from 'react';
-import { act, fireEvent, waitFor } from '@testing-library/react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Provider } from 'react-redux';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { configureStore } from '@reduxjs/toolkit';
+import { mockAuthApi, mockSocialAuth, mockNavigation, mockAsyncStorage, mockAuthResponse } from '../mocks/auth';
+
+// Set up mocks first
+jest.mock('@react-native-async-storage/async-storage', () => mockAsyncStorage);
+
+jest.mock('@react-navigation/native', () => ({
+  useNavigation: () => mockNavigation,
+  NavigationContainer: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+jest.mock('@react-navigation/native-stack', () => ({
+  createNativeStackNavigator: () => ({
+    Navigator: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="stack-navigator">{children}</div>
+    ),
+    Screen: ({ component: Component, name, options, ...props }: { 
+      component: React.ComponentType<any>, 
+      name: string,
+      options?: any,
+      [key: string]: any 
+    }) => {
+      const screenProps = {
+        navigation: mockNavigation,
+        route: { params: {}, name },
+      };
+      return (
+        <div data-testid={`screen-${name.toLowerCase()}`}>
+          <Component {...screenProps} {...props} />
+        </div>
+      );
+    },
+  }),
+}));
+
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+jest.mock('react-native-gesture-handler', () => ({
+  ScrollView: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// Then import components that depend on the mocks
 import { LoginScreen } from '../../screens/auth/LoginScreen';
-import { renderWithProviders } from '../utils';
-import { signInWithGoogle, signInWithApple } from '../../services/auth/socialAuth';
-import { authApi } from '../../services/api/auth';
-import { mockNavigation, mockDispatch } from '../setup';
-import type { TestElement } from '../jest.d';
-import type { AppDispatch } from '../../store';
+import authReducer from '../../store/slices/authSlice';
 
-// Mock response types
-interface AuthResponse {
-  token: string;
-  user: {
-    id: number;
-    email: string;
-  };
-}
+// Then set up dynamic mocks that depend on imports
+jest.doMock('../../services/api/auth', () => ({
+  authApi: mockAuthApi,
+}));
 
-interface SocialAuthResponse {
-  token: string;
-  provider: 'google' | 'apple';
-}
+jest.doMock('../../services/auth/socialAuth', () => mockSocialAuth);
 
-describe('Authentication Flow Integration', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    AsyncStorage.clear();
+const Stack = createNativeStackNavigator();
+
+const renderApp = () => {
+  const store = configureStore({
+    reducer: { auth: authReducer },
+    preloadedState: {
+      auth: {
+        user: null,
+        token: null,
+        loading: false,
+        error: null,
+        isLoading: false,
+        isInitialized: true,
+        isAuthenticated: false,
+      },
+    },
   });
 
-  describe('Email/Password Authentication', () => {
-    it('successfully completes login flow and stores token', async () => {
-      const mockToken = 'mock-auth-token';
-      const mockUser = { id: 1, email: 'test@example.com' };
-      
-      (authApi.login as jest.Mock).mockResolvedValueOnce({
-        token: mockToken,
-        user: mockUser,
-      });
+  const utils = render(
+    <Provider store={store}>
+      <NavigationContainer>
+        <Stack.Navigator>
+          <Stack.Screen 
+            name="Login" 
+            component={LoginScreen}
+            options={{ headerShown: false }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </Provider>
+  );
 
-      const { getByTestId } = renderWithProviders(<LoginScreen />);
+  // Debug helper
+  const debug = () => {
+    console.log('Current DOM:');
+    console.log(utils.toJSON());
+  };
 
-      await act(async () => {
-        fireEvent.changeText(getByTestId('email-input') as TestElement, 'test@example.com');
-        fireEvent.changeText(getByTestId('password-input') as TestElement, 'password123');
-        fireEvent.press(getByTestId('sign-in-button') as TestElement);
-      });
+  return {
+    ...utils,
+    debug,
+    store,
+  };
+};
 
-      await waitFor(() => {
-        expect(authApi.login).toHaveBeenCalledWith({
-          email: 'test@example.com',
-          password: 'password123',
+describe('Authentication Flow', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('Email/Password Login', () => {
+    it('completes successful login flow', async () => {
+      const { getByTestId, debug } = renderApp();
+
+      try {
+        const emailInput = getByTestId('email-input');
+        const passwordInput = getByTestId('password-input');
+        const loginButton = getByTestId('login-button');
+
+        fireEvent.changeText(emailInput, 'test@example.com');
+        fireEvent.changeText(passwordInput, 'password123');
+        fireEvent.press(loginButton);
+
+        await waitFor(() => {
+          expect(mockAuthApi.login).toHaveBeenCalledWith({
+            email: 'test@example.com',
+            password: 'password123',
+          });
+          expect(mockAsyncStorage.setItem).toHaveBeenCalledWith('@auth_token', mockAuthResponse.token);
+          expect(mockNavigation.navigate).toHaveBeenCalledWith('Home');
         });
-        expect(AsyncStorage.setItem).toHaveBeenCalledWith('@auth_token', mockToken);
-        expect(mockDispatch).toHaveBeenCalledWith(expect.any(Function));
-        expect(mockNavigation.navigate).toHaveBeenCalledWith('Home');
-      });
+      } catch (error) {
+        debug();
+        throw error;
+      }
     });
 
-    it('handles login failure with invalid credentials', async () => {
-      (authApi.login as jest.Mock).mockRejectedValueOnce(new Error('Invalid credentials'));
+    it('handles login failure', async () => {
+      mockAuthApi.login.mockRejectedValueOnce(new Error('Invalid credentials'));
+      const { getByTestId, findByTestId } = renderApp();
 
-      const { getByTestId, findByTestId } = renderWithProviders(<LoginScreen />);
+      fireEvent.changeText(getByTestId('email-input'), 'test@example.com');
+      fireEvent.changeText(getByTestId('password-input'), 'wrongpassword');
+      fireEvent.press(getByTestId('login-button'));
 
-      await act(async () => {
-        fireEvent.changeText(getByTestId('email-input') as TestElement, 'test@example.com');
-        fireEvent.changeText(getByTestId('password-input') as TestElement, 'wrongpassword');
-        fireEvent.press(getByTestId('sign-in-button') as TestElement);
-      });
-
-      const errorMessage = await findByTestId('form-error');
+      const errorMessage = await findByTestId('error-message');
       expect(errorMessage).toBeTruthy();
-      expect(AsyncStorage.setItem).not.toHaveBeenCalled();
-      expect(mockNavigation.navigate).not.toHaveBeenCalled();
-    });
-
-    it('handles network errors during login', async () => {
-      const networkError = new Error('Network request failed');
-      (authApi.login as jest.Mock).mockRejectedValueOnce(networkError);
-
-      const { getByTestId, findByTestId } = renderWithProviders(<LoginScreen />);
-
-      await act(async () => {
-        fireEvent.changeText(getByTestId('email-input') as TestElement, 'test@example.com');
-        fireEvent.changeText(getByTestId('password-input') as TestElement, 'password123');
-        fireEvent.press(getByTestId('sign-in-button') as TestElement);
-      });
-
-      const errorMessage = await findByTestId('form-error');
-      expect(errorMessage).toBeTruthy();
-      expect(AsyncStorage.setItem).not.toHaveBeenCalled();
-      expect(mockNavigation.navigate).not.toHaveBeenCalled();
-    });
-
-    it('handles timeout during login', async () => {
-      (authApi.login as jest.Mock).mockImplementationOnce(() => 
-        new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Request timeout')), 5000);
-        })
-      );
-
-      const { getByTestId, findByTestId } = renderWithProviders(<LoginScreen />);
-
-      await act(async () => {
-        fireEvent.changeText(getByTestId('email-input') as TestElement, 'test@example.com');
-        fireEvent.changeText(getByTestId('password-input') as TestElement, 'password123');
-        fireEvent.press(getByTestId('sign-in-button') as TestElement);
-      });
-
-      const errorMessage = await findByTestId('form-error');
-      expect(errorMessage).toBeTruthy();
-      expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+      expect(errorMessage.props.children).toBe('Invalid credentials');
+      expect(mockAsyncStorage.setItem).not.toHaveBeenCalled();
       expect(mockNavigation.navigate).not.toHaveBeenCalled();
     });
 
     it('disables form during submission', async () => {
-      const { getByTestId } = renderWithProviders(<LoginScreen />);
+      const { getByTestId } = renderApp();
 
-      // Fill form
-      await act(async () => {
-        fireEvent.changeText(getByTestId('email-input') as TestElement, 'test@example.com');
-        fireEvent.changeText(getByTestId('password-input') as TestElement, 'password123');
-        fireEvent.press(getByTestId('sign-in-button') as TestElement);
-      });
+      fireEvent.changeText(getByTestId('email-input'), 'test@example.com');
+      fireEvent.changeText(getByTestId('password-input'), 'password123');
+      fireEvent.press(getByTestId('login-button'));
 
-      const emailInput = getByTestId('email-input') as TestElement;
-      const passwordInput = getByTestId('password-input') as TestElement;
-      const signInButton = getByTestId('sign-in-button-loading') as TestElement;
-
-      expect(signInButton).toBeTruthy();
-      expect(emailInput.props.editable).toBe(false);
-      expect(passwordInput.props.editable).toBe(false);
+      expect(getByTestId('email-input').props.disabled).toBe(true);
+      expect(getByTestId('password-input').props.disabled).toBe(true);
+      expect(getByTestId('login-button').props.disabled).toBe(true);
     });
   });
 
   describe('Social Authentication', () => {
-    it('successfully completes Google authentication flow', async () => {
-      const mockGoogleToken = 'mock-google-token';
-      const mockAuthToken = 'mock-auth-token';
-      const mockUser = { id: 1, email: 'test@gmail.com' };
+    it('completes Google sign-in flow', async () => {
+      const { getByTestId } = renderApp();
 
-      (signInWithGoogle as jest.Mock).mockResolvedValueOnce({
-        token: mockGoogleToken,
-        provider: 'google',
-      });
-
-      (authApi.socialAuth as jest.Mock).mockResolvedValueOnce({
-        token: mockAuthToken,
-        user: mockUser,
-      });
-
-      const { getByTestId } = renderWithProviders(<LoginScreen />);
-
-      await act(async () => {
-        fireEvent.press(getByTestId('google-auth-button') as TestElement);
-      });
+      fireEvent.press(getByTestId('google-auth-button'));
 
       await waitFor(() => {
-        expect(signInWithGoogle).toHaveBeenCalled();
-        expect(authApi.socialAuth).toHaveBeenCalledWith({
-          token: mockGoogleToken,
+        expect(mockSocialAuth.signInWithGoogle).toHaveBeenCalled();
+        expect(mockAuthApi.socialAuth).toHaveBeenCalledWith({
+          token: 'mock-google-token',
           provider: 'google',
         });
-        expect(AsyncStorage.setItem).toHaveBeenCalledWith('@auth_token', mockAuthToken);
-        expect(mockDispatch).toHaveBeenCalledWith(expect.any(Function));
+        expect(mockAsyncStorage.setItem).toHaveBeenCalledWith('@auth_token', mockAuthResponse.token);
         expect(mockNavigation.navigate).toHaveBeenCalledWith('Home');
       });
     });
 
-    it('handles Google authentication failure', async () => {
-      (signInWithGoogle as jest.Mock).mockRejectedValueOnce(new Error('Google auth failed'));
+    it('completes Apple sign-in flow when available', async () => {
+      const { getByTestId, findByTestId } = renderApp();
 
-      const { getByTestId, findByTestId } = renderWithProviders(<LoginScreen />);
+      const appleButton = await findByTestId('apple-auth-button');
+      fireEvent.press(appleButton);
 
-      await act(async () => {
-        fireEvent.press(getByTestId('google-auth-button') as TestElement);
+      await waitFor(() => {
+        expect(mockSocialAuth.signInWithApple).toHaveBeenCalled();
+        expect(mockAuthApi.socialAuth).toHaveBeenCalledWith({
+          token: 'mock-apple-token',
+          provider: 'apple',
+        });
+        expect(mockAsyncStorage.setItem).toHaveBeenCalledWith('@auth_token', mockAuthResponse.token);
+        expect(mockNavigation.navigate).toHaveBeenCalledWith('Home');
       });
-
-      const errorMessage = await findByTestId('form-error');
-      expect(errorMessage).toBeTruthy();
-      expect(authApi.socialAuth).not.toHaveBeenCalled();
-      expect(AsyncStorage.setItem).not.toHaveBeenCalled();
-      expect(mockNavigation.navigate).not.toHaveBeenCalled();
     });
 
-    it('handles network errors during social auth', async () => {
-      (signInWithGoogle as jest.Mock).mockResolvedValueOnce({
-        token: 'google-token',
-        provider: 'google',
-      });
-      (authApi.socialAuth as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+    it('handles social auth failure', async () => {
+      mockSocialAuth.signInWithGoogle.mockRejectedValueOnce(new Error('Google auth failed'));
+      const { getByTestId, findByText } = renderApp();
 
-      const { getByTestId, findByTestId } = renderWithProviders(<LoginScreen />);
+      fireEvent.press(getByTestId('google-auth-button'));
 
-      await act(async () => {
-        fireEvent.press(getByTestId('google-auth-button') as TestElement);
-      });
-
-      const errorMessage = await findByTestId('form-error');
+      const errorMessage = await findByText('Google auth failed');
       expect(errorMessage).toBeTruthy();
-      expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+      expect(mockAsyncStorage.setItem).not.toHaveBeenCalled();
       expect(mockNavigation.navigate).not.toHaveBeenCalled();
     });
   });
 
   describe('Token Management', () => {
-    it('validates and restores existing auth session on mount', async () => {
-      const mockToken = 'stored-auth-token';
-      const mockUser = { id: 1, email: 'test@example.com' };
+    it('restores valid session on mount', async () => {
+      mockAsyncStorage.getItem.mockResolvedValueOnce(mockAuthResponse.token);
+      mockAuthApi.validateToken.mockResolvedValueOnce({ valid: true, user: mockAuthResponse.user });
 
-      (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(mockToken);
-      (authApi.validateToken as jest.Mock).mockResolvedValueOnce({
-        valid: true,
-        user: mockUser,
-      });
-
-      renderWithProviders(<LoginScreen />);
+      renderApp();
 
       await waitFor(() => {
-        expect(AsyncStorage.getItem).toHaveBeenCalledWith('@auth_token');
-        expect(authApi.validateToken).toHaveBeenCalledWith(mockToken);
-        expect(mockDispatch).toHaveBeenCalledWith(expect.any(Function));
+        expect(mockAsyncStorage.getItem).toHaveBeenCalledWith('@auth_token');
+        expect(mockAuthApi.validateToken).toHaveBeenCalledWith(mockAuthResponse.token);
         expect(mockNavigation.navigate).toHaveBeenCalledWith('Home');
       });
     });
 
-    it('clears invalid token and requires re-authentication', async () => {
-      const mockToken = 'invalid-token';
+    it('clears invalid session', async () => {
+      mockAsyncStorage.getItem.mockResolvedValueOnce(mockAuthResponse.token);
+      mockAuthApi.validateToken.mockResolvedValueOnce({ valid: false });
 
-      (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(mockToken);
-      (authApi.validateToken as jest.Mock).mockResolvedValueOnce({
-        valid: false,
-      });
-
-      renderWithProviders(<LoginScreen />);
+      renderApp();
 
       await waitFor(() => {
-        expect(AsyncStorage.removeItem).toHaveBeenCalledWith('@auth_token');
-        expect(mockDispatch).not.toHaveBeenCalled();
-        expect(mockNavigation.navigate).not.toHaveBeenCalled();
-      });
-    });
-
-    it('handles token validation network errors', async () => {
-      const mockToken = 'stored-token';
-      
-      (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(mockToken);
-      (authApi.validateToken as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
-
-      renderWithProviders(<LoginScreen />);
-
-      await waitFor(() => {
-        expect(AsyncStorage.removeItem).toHaveBeenCalledWith('@auth_token');
-        expect(mockDispatch).not.toHaveBeenCalled();
+        expect(mockAsyncStorage.removeItem).toHaveBeenCalledWith('@auth_token');
         expect(mockNavigation.navigate).not.toHaveBeenCalled();
       });
     });

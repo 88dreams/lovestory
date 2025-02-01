@@ -1,76 +1,43 @@
 import React from 'react';
-import { View, StyleSheet, StyleProp, ViewStyle, DimensionValue } from 'react-native';
+import { View, StyleSheet, ViewStyle } from 'react-native';
 import { useThemedStyles } from '../../theme/ThemeProvider';
+import { Body2 } from './Typography';
 import type { Theme } from '../../theme/types';
 
 interface DividerProps {
-  orientation?: 'horizontal' | 'vertical';
-  thickness?: number;
-  length?: DimensionValue;
-  style?: StyleProp<ViewStyle>;
-  color?: string;
+  children?: React.ReactNode;
+  style?: ViewStyle;
 }
 
-const createStyles = (theme: Theme) => {
-  return StyleSheet.create({
-    horizontal: {
-      width: '100%',
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: theme.colors.border.light,
-    },
-    vertical: {
-      width: StyleSheet.hairlineWidth,
-      height: '100%',
-      backgroundColor: theme.colors.border.light,
-    },
-  });
-};
+const createStyles = (theme: Theme) => StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: theme.spacing.lg,
+  },
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.colors.border.light,
+  },
+  text: {
+    marginHorizontal: theme.spacing.md,
+    color: theme.colors.text.secondary,
+  },
+});
 
-export const Divider: React.FC<DividerProps> = ({
-  orientation = 'horizontal',
-  thickness = StyleSheet.hairlineWidth,
-  length = '100%',
-  style,
-  color,
-}) => {
+export const Divider: React.FC<DividerProps> = ({ children, style }) => {
   const styles = useThemedStyles(createStyles);
 
-  const dividerStyle: StyleProp<ViewStyle> = [
-    styles[orientation],
-    {
-      ...(orientation === 'horizontal'
-        ? {
-            height: thickness,
-            width: length,
-          }
-        : {
-            width: thickness,
-            height: length,
-          }),
-    },
-    color && { backgroundColor: color },
-    style,
-  ];
+  if (!children) {
+    return <View style={[styles.line, style]} />;
+  }
 
-  return <View style={dividerStyle} accessibilityRole="none" />;
+  return (
+    <View style={[styles.container, style]}>
+      <View style={styles.line} />
+      <Body2 style={styles.text}>{children}</Body2>
+      <View style={styles.line} />
+    </View>
+  );
 };
-
-// Example usage:
-/*
-import { Divider } from './components/common/Divider';
-
-// Horizontal divider (default)
-<Divider />
-
-// Custom thickness
-<Divider thickness={2} />
-
-// Vertical divider with specific height
-<Divider orientation="vertical" length={24} />
-
-// Custom color
-<Divider color={theme.colors.primary[300]} />
-
-// With custom style
-<Divider style={{ marginVertical: theme.spacing.md }} />
-*/ 
