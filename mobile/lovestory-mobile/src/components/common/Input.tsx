@@ -20,6 +20,7 @@ interface InputProps extends Omit<TextInputProps, 'style'> {
   inputStyle?: StyleProp<TextStyle>;
   labelStyle?: StyleProp<TextStyle>;
   helperStyle?: StyleProp<TextStyle>;
+  testID?: string;
 }
 
 const createStyles = (theme: Theme) => {
@@ -70,6 +71,7 @@ export const Input = React.forwardRef<TextInput, InputProps>(({
   labelStyle,
   helperStyle,
   editable = true,
+  testID,
   ...props
 }, ref) => {
   const styles = useThemedStyles(createStyles);
@@ -105,6 +107,8 @@ export const Input = React.forwardRef<TextInput, InputProps>(({
           // React Native doesn't support 'invalid' state,
           // we'll use error messages for accessibility instead
         }}
+        testID={testID}
+        nativeID={testID}
         {...props}
       />
 

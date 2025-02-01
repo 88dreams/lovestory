@@ -21,6 +21,7 @@ interface TypographyProps {
     | 'none';
   accessibilityLabel?: string;
   onPress?: () => void;
+  testID?: string;
 }
 
 const createStyles = (theme: Theme) => {
@@ -48,6 +49,7 @@ const createTypographyComponent = (variant: keyof ReturnType<typeof createStyles
     accessibilityRole = 'text',
     accessibilityLabel,
     onPress,
+    testID,
     ...props
   }, ref) => {
     const styles = useThemedStyles(createStyles);
@@ -66,6 +68,7 @@ const createTypographyComponent = (variant: keyof ReturnType<typeof createStyles
         accessibilityRole={variant.startsWith('h') ? 'header' : accessibilityRole}
         accessibilityLabel={accessibilityLabel}
         onPress={onPress}
+        testID={testID}
         {...props}
       >
         {children}

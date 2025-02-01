@@ -121,9 +121,9 @@ export const LoginScreen = () => {
     <Screen>
       <View style={styles.container} accessible={true} accessibilityRole="none">
         <View style={styles.header} accessible={true} accessibilityRole="header">
-          <H1 accessibilityRole="header">Welcome Back</H1>
+          <H1 accessibilityRole="header" testID="welcome-text">Welcome Back</H1>
           <Spacer size="xs" />
-          <Body1 color="textSecondary" accessibilityRole="text">
+          <Body1 color="textSecondary" accessibilityRole="text" testID="subtitle-text">
             Sign in to continue
           </Body1>
         </View>
@@ -144,6 +144,7 @@ export const LoginScreen = () => {
             accessibilityLabel="Email input field"
             accessibilityHint="Enter your email address to sign in"
             accessibilityRole="text"
+            testID="email-input"
           />
           <Spacer size="md" />
           <Input
@@ -161,6 +162,7 @@ export const LoginScreen = () => {
             accessibilityLabel="Password input field"
             accessibilityHint="Enter your password to sign in"
             accessibilityRole="text"
+            testID="password-input"
           />
 
           <Button
@@ -170,6 +172,7 @@ export const LoginScreen = () => {
             onPress={navigateToForgotPassword}
             accessibilityLabel="Forgot password button"
             accessibilityHint="Navigate to password reset screen"
+            testID="forgot-password-button"
           />
 
           <Spacer size="lg" />
@@ -182,6 +185,7 @@ export const LoginScreen = () => {
             onPress={handleLogin}
             accessibilityLabel={`Sign in button${loading ? ', loading' : ''}`}
             accessibilityHint="Sign in to your account"
+            testID="sign-in-button"
           />
 
           {error && (
@@ -211,39 +215,43 @@ export const LoginScreen = () => {
           <Divider />
         </View>
 
-        <View style={styles.socialButton} accessible={true} accessibilityRole="none">
-          <Icon 
-            name="google" 
-            size="md" 
-            style={styles.socialIcon}
-            accessibilityLabel="Google icon"
-          />
-          <Button
-            label="Continue with Google"
-            variant="outlined"
-            onPress={() => handleSocialAuth('google')}
-            accessibilityLabel="Sign in with Google button"
-            accessibilityHint="Sign in using your Google account"
-          />
-        </View>
+        <Button
+          label="Continue with Google"
+          variant="outlined"
+          onPress={() => handleSocialAuth('google')}
+          accessibilityLabel="Sign in with Google button"
+          accessibilityHint="Sign in using your Google account"
+          testID="google-auth-button"
+          style={styles.socialButton}
+          icon={
+            <Icon 
+              name="google" 
+              size="md" 
+              style={styles.socialIcon}
+              accessibilityLabel="Google icon"
+            />
+          }
+        />
 
         <Spacer size="md" />
 
-        <View style={styles.socialButton} accessible={true} accessibilityRole="none">
-          <Icon 
-            name="apple" 
-            size="md" 
-            style={styles.socialIcon}
-            accessibilityLabel="Apple icon"
-          />
-          <Button
-            label="Continue with Apple"
-            variant="outlined"
-            onPress={() => handleSocialAuth('apple')}
-            accessibilityLabel="Sign in with Apple button"
-            accessibilityHint="Sign in using your Apple account"
-          />
-        </View>
+        <Button
+          label="Continue with Apple"
+          variant="outlined"
+          onPress={() => handleSocialAuth('apple')}
+          accessibilityLabel="Sign in with Apple button"
+          accessibilityHint="Sign in using your Apple account"
+          testID="apple-auth-button"
+          style={styles.socialButton}
+          icon={
+            <Icon 
+              name="apple" 
+              size="md" 
+              style={styles.socialIcon}
+              accessibilityLabel="Apple icon"
+            />
+          }
+        />
 
         <View style={styles.footer} accessible={true} accessibilityRole="none">
           <Body2 
@@ -258,6 +266,7 @@ export const LoginScreen = () => {
             onPress={navigateToRegister}
             accessibilityLabel="Sign up button"
             accessibilityHint="Navigate to create account screen"
+            testID="sign-up-button"
           />
         </View>
       </View>

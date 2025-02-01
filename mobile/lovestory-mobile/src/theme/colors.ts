@@ -34,8 +34,8 @@ export const lightColors: ThemeColors = {
   text: {
     primary: '#000000',
     secondary: '#3C3C43',
-    disabled: '#8E8E93',
-    inverse: '#FFFFFF',
+    disabled: '#6B6B6B',
+    inverse: '#000000',
   },
   border: {
     light: '#E5E5EA',
@@ -66,8 +66,8 @@ export const darkColors: ThemeColors = {
   text: {
     primary: '#FFFFFF',
     secondary: '#EBEBF5',
-    disabled: '#98989D',
-    inverse: '#000000',
+    disabled: '#ADADB0',
+    inverse: '#FFFFFF',
   },
   border: {
     light: '#38383A',

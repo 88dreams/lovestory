@@ -25,6 +25,8 @@ interface ButtonProps {
   labelStyle?: StyleProp<TextStyle>;
   accessibilityLabel?: string;
   accessibilityHint?: string;
+  testID?: string;
+  icon?: React.ReactNode;
 }
 
 const createStyles = (theme: Theme) => {
@@ -131,6 +133,8 @@ export const Button: React.FC<ButtonProps> = ({
   labelStyle,
   accessibilityLabel,
   accessibilityHint,
+  testID,
+  icon,
 }) => {
   const styles = useThemedStyles(createStyles);
   const { theme } = useTheme();
@@ -164,6 +168,7 @@ export const Button: React.FC<ButtonProps> = ({
         disabled,
         busy: loading,
       }}
+      testID={testID}
     >
       {loading ? (
         <ActivityIndicator
@@ -174,7 +179,10 @@ export const Button: React.FC<ButtonProps> = ({
           accessibilityRole="progressbar"
         />
       ) : (
-        <Text style={textStyles}>{label}</Text>
+        <>
+          {icon}
+          <Text style={textStyles}>{label}</Text>
+        </>
       )}
     </TouchableOpacity>
   );

@@ -4,6 +4,7 @@
 1. [Shell Environment](#shell-environment)
 2. [Environment Configurations](#environment-configurations)
 3. [Build Configuration](#build-configuration)
+4. [Testing Infrastructure](#testing-infrastructure)
 
 ## Shell Environment
 
@@ -182,6 +183,68 @@ GoogleService-Info.plist
 - [ ] Create environment-specific Google configurations
 - [ ] Set up Apple Sign-In for each environment
 
-Last Updated: January 31, 2025
+## Testing Infrastructure
+
+### Jest Configuration
+The testing environment is set up using Jest with React Native Testing Library. Key configurations are in:
+- `jest.setup.js`: Global test setup and mocks
+- `src/test/utils.tsx`: Test utilities and wrapper components
+- `src/test/setup.ts`: Mock implementations and state
+
+### Component Testing
+Tests are located alongside their components in `__tests__` directories. Example:
+```typescript
+// src/screens/auth/__tests__/LoginScreen.test.tsx
+describe('LoginScreen', () => {
+  it('renders correctly with all UI elements')
+  it('handles form input changes')
+  it('handles successful login')
+  it('handles failed login')
+  it('handles social auth')
+});
+```
+
+### Mock Implementations
+Redux and navigation mocks are configured in `src/test/setup.ts`:
+```typescript
+export const mockDispatch = jest.fn();
+export const mockSelector = jest.fn();
+export const mockNavigate = jest.fn();
+```
+
+### Theme and Accessibility
+- Theme colors are configured to meet WCAG AA contrast standards
+- Light theme text colors:
+  - primary: #000000
+  - secondary: #3C3C43
+  - disabled: #6B6B6B (4.5:1 ratio)
+  - inverse: #000000
+- Dark theme text colors:
+  - primary: #FFFFFF
+  - secondary: #EBEBF5
+  - disabled: #ADADB0 (4.5:1 ratio)
+  - inverse: #FFFFFF
+
+### Running Tests
+```bash
+# Run all tests
+yarn test
+
+# Run specific test file
+yarn test LoginScreen
+
+# Run with verbose output
+yarn test LoginScreen --verbose
+
+# Run with coverage
+yarn test --coverage
+```
+
+### Known Testing Notes
+- Animated component updates may show act(...) warnings in tests
+- These warnings don't affect test validity or coverage
+- Warnings are from React Native's internal animation system
+
+Last Updated: February 1, 2024
 
 Note: Keep this file updated as new configuration requirements are added. Do not store actual production values in this file. 
