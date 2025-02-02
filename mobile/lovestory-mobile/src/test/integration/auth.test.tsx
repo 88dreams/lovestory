@@ -5,58 +5,15 @@ import { Provider } from 'react-redux';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { configureStore } from '@reduxjs/toolkit';
-import { mockAuthApi, mockSocialAuth, mockNavigation, mockAsyncStorage, mockAuthResponse } from '../mocks/auth';
-
-// Set up mocks first
-jest.mock('@react-native-async-storage/async-storage', () => mockAsyncStorage);
-
-jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => mockNavigation,
-  NavigationContainer: ({ children }: { children: React.ReactNode }) => children,
-}));
-
-jest.mock('@react-navigation/native-stack', () => ({
-  createNativeStackNavigator: () => ({
-    Navigator: ({ children }: { children: React.ReactNode }) => (
-      <div data-testid="stack-navigator">{children}</div>
-    ),
-    Screen: ({ component: Component, name, options, ...props }: { 
-      component: React.ComponentType<any>, 
-      name: string,
-      options?: any,
-      [key: string]: any 
-    }) => {
-      const screenProps = {
-        navigation: mockNavigation,
-        route: { params: {}, name },
-      };
-      return (
-        <div data-testid={`screen-${name.toLowerCase()}`}>
-          <Component {...screenProps} {...props} />
-        </div>
-      );
-    },
-  }),
-}));
-
-jest.mock('react-native-safe-area-context', () => ({
-  SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
-}));
-
-jest.mock('react-native-gesture-handler', () => ({
-  ScrollView: ({ children }: { children: React.ReactNode }) => children,
-}));
-
-// Then import components that depend on the mocks
 import { LoginScreen } from '../../screens/auth/LoginScreen';
 import authReducer from '../../store/slices/authSlice';
-
-// Then set up dynamic mocks that depend on imports
-jest.doMock('../../services/api/auth', () => ({
-  authApi: mockAuthApi,
-}));
-
-jest.doMock('../../services/auth/socialAuth', () => mockSocialAuth);
+import { 
+  mockAuthApi, 
+  mockSocialAuth, 
+  mockAsyncStorage, 
+  mockNavigation,
+  mockAuthResponse 
+} from '../setupJest';
 
 const Stack = createNativeStackNavigator();
 
@@ -67,13 +24,12 @@ const renderApp = () => {
       auth: {
         user: null,
         token: null,
-        loading: false,
-        error: null,
         isLoading: false,
+        error: null,
         isInitialized: true,
         isAuthenticated: false,
-      },
-    },
+      }
+    }
   });
 
   const utils = render(
@@ -110,29 +66,20 @@ describe('Authentication Flow', () => {
 
   describe('Email/Password Login', () => {
     it('completes successful login flow', async () => {
-      const { getByTestId, debug } = renderApp();
+      const { getByTestId } = renderApp();
 
-      try {
-        const emailInput = getByTestId('email-input');
-        const passwordInput = getByTestId('password-input');
-        const loginButton = getByTestId('login-button');
+      fireEvent.changeText(getByTestId('email-input'), 'test@example.com');
+      fireEvent.changeText(getByTestId('password-input'), 'password123');
+      fireEvent.press(getByTestId('login-button'));
 
-        fireEvent.changeText(emailInput, 'test@example.com');
-        fireEvent.changeText(passwordInput, 'password123');
-        fireEvent.press(loginButton);
-
-        await waitFor(() => {
-          expect(mockAuthApi.login).toHaveBeenCalledWith({
-            email: 'test@example.com',
-            password: 'password123',
-          });
-          expect(mockAsyncStorage.setItem).toHaveBeenCalledWith('@auth_token', mockAuthResponse.token);
-          expect(mockNavigation.navigate).toHaveBeenCalledWith('Home');
+      await waitFor(() => {
+        expect(mockAuthApi.login).toHaveBeenCalledWith({
+          email: 'test@example.com',
+          password: 'password123',
         });
-      } catch (error) {
-        debug();
-        throw error;
-      }
+        expect(mockAsyncStorage.setItem).toHaveBeenCalledWith('@auth_token', mockAuthResponse.token);
+        expect(mockNavigation.navigate).toHaveBeenCalledWith('Home');
+      });
     });
 
     it('handles login failure', async () => {
@@ -157,8 +104,8 @@ describe('Authentication Flow', () => {
       fireEvent.changeText(getByTestId('password-input'), 'password123');
       fireEvent.press(getByTestId('login-button'));
 
-      expect(getByTestId('email-input').props.disabled).toBe(true);
-      expect(getByTestId('password-input').props.disabled).toBe(true);
+      expect(getByTestId('email-input').props.editable).toBe(false);
+      expect(getByTestId('password-input').props.editable).toBe(false);
       expect(getByTestId('login-button').props.disabled).toBe(true);
     });
   });
@@ -181,10 +128,9 @@ describe('Authentication Flow', () => {
     });
 
     it('completes Apple sign-in flow when available', async () => {
-      const { getByTestId, findByTestId } = renderApp();
+      const { getByTestId } = renderApp();
 
-      const appleButton = await findByTestId('apple-auth-button');
-      fireEvent.press(appleButton);
+      fireEvent.press(getByTestId('apple-auth-button'));
 
       await waitFor(() => {
         expect(mockSocialAuth.signInWithApple).toHaveBeenCalled();
@@ -199,12 +145,13 @@ describe('Authentication Flow', () => {
 
     it('handles social auth failure', async () => {
       mockSocialAuth.signInWithGoogle.mockRejectedValueOnce(new Error('Google auth failed'));
-      const { getByTestId, findByText } = renderApp();
+      const { getByTestId, findByTestId } = renderApp();
 
       fireEvent.press(getByTestId('google-auth-button'));
 
-      const errorMessage = await findByText('Google auth failed');
+      const errorMessage = await findByTestId('error-message');
       expect(errorMessage).toBeTruthy();
+      expect(errorMessage.props.children).toBe('Google auth failed');
       expect(mockAsyncStorage.setItem).not.toHaveBeenCalled();
       expect(mockNavigation.navigate).not.toHaveBeenCalled();
     });
@@ -225,7 +172,7 @@ describe('Authentication Flow', () => {
     });
 
     it('clears invalid session', async () => {
-      mockAsyncStorage.getItem.mockResolvedValueOnce(mockAuthResponse.token);
+      mockAsyncStorage.getItem.mockResolvedValueOnce('invalid-token');
       mockAuthApi.validateToken.mockResolvedValueOnce({ valid: false });
 
       renderApp();

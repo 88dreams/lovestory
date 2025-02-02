@@ -1,8 +1,150 @@
-// Import dependencies
+// Import jest first
 import { jest } from '@jest/globals';
-import type { Action, ThunkDispatch as BaseThunkDispatch } from '@reduxjs/toolkit';
+import type { NativeModules } from 'react-native';
+
+// Define all mocks that might be used by other imports
+export const mockAsyncStorage = {
+  getItem: jest.fn(async (key: string): Promise<string | null> => null),
+  setItem: jest.fn(async (key: string, value: string): Promise<void> => {}),
+  removeItem: jest.fn(async (key: string): Promise<void> => {}),
+  clear: jest.fn(async (): Promise<void> => {}),
+};
+
+// Define auth mocks
+export const mockAuthResponse = {
+  token: 'mock-token',
+  user: {
+    id: '1',
+    email: 'test@example.com',
+    name: 'Test User',
+    isEmailVerified: false,
+  }
+};
+
+export const mockAuthApi = {
+  login: jest.fn(async (params: { email: string; password: string }) => {
+    if (params.email === 'test@example.com' && params.password === 'password123') {
+      return mockAuthResponse;
+    }
+    throw new Error('Invalid credentials');
+  }),
+  validateToken: jest.fn(async (token: string) => {
+    if (token === mockAuthResponse.token) {
+      return { valid: true, user: mockAuthResponse.user };
+    }
+    return { valid: false };
+  }),
+  socialAuth: jest.fn(async (params: { token: string; provider: 'google' | 'apple' }) => {
+    if (params.token && params.provider) {
+      return mockAuthResponse;
+    }
+    throw new Error(`Failed to sign in with ${params.provider}`);
+  }),
+};
+
+export const mockSocialAuth = {
+  signInWithGoogle: jest.fn(async () => 'mock-google-token'),
+  signInWithApple: jest.fn(async () => 'mock-apple-token'),
+  isAppleSignInAvailable: jest.fn(async () => true),
+};
+
+export const mockNavigation = {
+  navigate: jest.fn((route: string) => {}),
+  goBack: jest.fn(() => {}),
+};
+
+// Mock AsyncStorage immediately
+jest.mock('@react-native-async-storage/async-storage', () => mockAsyncStorage);
+
+// Mock auth services immediately
+jest.mock('../services/api/auth', () => ({
+  authApi: mockAuthApi,
+}));
+
+jest.mock('../services/auth/socialAuth', () => mockSocialAuth);
+
+// Mock React Native's Animated
+jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
+jest.mock('react-native', () => {
+  const RN = jest.requireActual<typeof import('react-native')>('react-native');
+  if (!RN.NativeModules.PlatformConstants) {
+    RN.NativeModules.PlatformConstants = {};
+  }
+  RN.NativeModules.PlatformConstants.forceTouchAvailable = false;
+  return {
+    Platform: RN.Platform,
+    StyleSheet: RN.StyleSheet,
+    View: RN.View,
+    Text: RN.Text,
+    TouchableOpacity: RN.TouchableOpacity,
+    TextInput: RN.TextInput,
+    Animated: {
+      timing: () => ({
+        start: jest.fn(),
+        reset: jest.fn(),
+        stop: jest.fn(),
+      }),
+      spring: () => ({
+        start: jest.fn(),
+        reset: jest.fn(),
+        stop: jest.fn(),
+      }),
+      Value: jest.fn(() => ({
+        setValue: jest.fn(),
+        setOffset: jest.fn(),
+        flattenOffset: jest.fn(),
+        extractOffset: jest.fn(),
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        removeAllListeners: jest.fn(),
+        stopAnimation: jest.fn(),
+        resetAnimation: jest.fn(),
+        interpolate: jest.fn(() => ({
+          __getValue: jest.fn(),
+          interpolate: jest.fn(),
+        })),
+        __getValue: jest.fn(),
+        __attach: jest.fn(),
+        __detach: jest.fn(),
+        __makeNative: jest.fn(),
+        __getNativeTag: jest.fn(),
+        __getNativeConfig: jest.fn(),
+      })),
+      createAnimatedComponent: (component: any) => component,
+    },
+    NativeModules: RN.NativeModules,
+  };
+});
+
+// Mock react-native settings
+const mockSettings = {
+  get: jest.fn(() => null),
+  set: jest.fn(),
+};
+jest.mock('react-native/Libraries/Settings/Settings', () => mockSettings);
+
+// Mock setImmediate
+(global as any).setImmediate = jest.fn((callback: () => void) => setTimeout(callback, 0));
+
+// Now import other dependencies
+import { configureStore } from '@reduxjs/toolkit';
+import type { Action, ThunkDispatch } from '@reduxjs/toolkit';
 import type * as ReactNavigation from '@react-navigation/native';
 import type * as ReactRedux from 'react-redux';
+import authReducer from '../store/slices/authSlice';
+
+// Import mocks
+import { mockReactNative } from './mocks/react-native';
+import {
+  mockTypography,
+  mockButton,
+  mockInput,
+  mockIcon,
+  mockScreen,
+  mockSpacer,
+  mockForm,
+  mockDivider,
+} from './mocks/components';
 
 // Add type declaration for unwrap
 declare module '@reduxjs/toolkit' {
@@ -20,19 +162,17 @@ type AppDispatch = {
   <T>(action: T): T extends (...args: any[]) => any ? ReturnType<T> & { unwrap(): Promise<any> } : Promise<T> & { unwrap(): Promise<any> };
 };
 
-// Import mocks
-import { mockAuthApi, mockSocialAuth, mockNavigation, mockAsyncStorage } from './mocks/auth';
-import { mockReactNative } from './mocks/react-native';
-import {
-  mockTypography,
-  mockButton,
-  mockInput,
-  mockIcon,
-  mockScreen,
-  mockSpacer,
-  mockForm,
-  mockDivider,
-} from './mocks/components';
+// Create test store
+export const createTestStore = (preloadedState = {}) => {
+  return configureStore({
+    reducer: { auth: authReducer },
+    preloadedState,
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware({
+        serializableCheck: false,
+      })
+  });
+};
 
 // Mock React Native first
 jest.mock('react-native', () => mockReactNative);
@@ -40,40 +180,11 @@ jest.mock('react-native', () => mockReactNative);
 // Then import and configure jest-native
 import '@testing-library/jest-native/extend-expect';
 
-// Define minimal types for our tests
-export interface AuthState {
-  user: null | Record<string, any>;
-  token: string | null;
-  loading: boolean;
-  error: string | null;
-  isLoading: boolean;
-  isInitialized: boolean;
-  isAuthenticated: boolean;
-}
-
-// Define the root state type for our tests
-interface RootState {
-  auth: AuthState;
-}
-
-// Mock AsyncStorage
-jest.mock('@react-native-async-storage/async-storage', () => mockAsyncStorage);
-
 // Mock react-native-safe-area-context
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
-
-// Mock react-native settings
-const mockSettings = {
-  get: jest.fn(() => null),
-  set: jest.fn(),
-};
-jest.mock('react-native/Libraries/Settings/Settings', () => mockSettings);
-
-// Mock setImmediate
-(global as any).setImmediate = jest.fn((callback: () => void) => setTimeout(callback, 0));
 
 // Silence React Native warnings
 const originalConsoleWarn = console.warn;
@@ -95,8 +206,6 @@ jest.mock('@react-navigation/native', () => {
     ...actual,
     useNavigation: () => mockNavigation,
     NavigationContainer: ({ children }: { children: React.ReactNode }) => children,
-    createNavigatorFactory: jest.fn(),
-    useRoute: () => ({ params: {} }),
   };
 });
 
@@ -106,75 +215,10 @@ jest.mock('react-redux', () => {
   return {
     ...actual,
     useDispatch: () => {
-      // Create a mock store state that matches our initial state
-      const mockState: RootState = {
-        auth: {
-          user: null,
-          token: null,
-          loading: false,
-          error: null,
-          isLoading: false,
-          isInitialized: true,
-          isAuthenticated: false,
-        }
-      };
-
-      // Create a recursive dispatch function that can handle nested dispatches
-      const createDispatch = () => {
-        const dispatch = jest.fn((action: any) => {
-          // If it's a thunk action (function), execute it with a new dispatch instance
-          if (typeof action === 'function') {
-            try {
-              const result = action(createDispatch(), () => mockState, undefined);
-              
-              // Handle async results
-              if (result instanceof Promise) {
-                return result
-                  .then((value) => {
-                    const promiseWithUnwrap = Promise.resolve(value) as AsyncActionResult<typeof value>;
-                    promiseWithUnwrap.unwrap = () => Promise.resolve(value?.payload || value);
-                    return promiseWithUnwrap;
-                  })
-                  .catch((error) => {
-                    // Create a rejected promise that matches Redux Toolkit's error format
-                    const rejectedPromise = Promise.reject(error) as AsyncActionResult<never>;
-                    rejectedPromise.unwrap = () => Promise.reject(error);
-                    return rejectedPromise; // Return instead of throw to allow error handling
-                  });
-              }
-              
-              return result;
-            } catch (error) {
-              // Handle synchronous errors
-              const rejectedPromise = Promise.reject(error) as AsyncActionResult<never>;
-              rejectedPromise.unwrap = () => Promise.reject(error);
-              return rejectedPromise; // Return instead of throw to allow error handling
-            }
-          }
-          
-          // For regular actions, return a promise with unwrap
-          const promise = Promise.resolve(action) as AsyncActionResult<typeof action>;
-          promise.unwrap = () => Promise.resolve(action?.payload || action);
-          return promise;
-        });
-        
-        return dispatch;
-      };
-
-      return createDispatch();
+      const store = createTestStore();
+      return store.dispatch;
     },
-    useSelector: jest.fn((selector: (state: RootState) => any) => selector({
-      auth: {
-        user: null,
-        token: null,
-        loading: false,
-        error: null,
-        isLoading: false,
-        isInitialized: true,
-        isAuthenticated: false,
-      }
-    })),
-    Provider: ({ children }: { children: React.ReactNode }) => children,
+    useSelector: jest.fn((selector: (state: { auth: any }) => any) => selector(createTestStore().getState())),
   };
 });
 
@@ -187,13 +231,6 @@ jest.mock('../components/common/Screen', () => mockScreen);
 jest.mock('../components/common/Spacer', () => mockSpacer);
 jest.mock('../components/common/form/Form', () => mockForm);
 jest.mock('../components/common/Divider', () => mockDivider);
-
-// Mock auth services
-jest.mock('../services/api/auth', () => ({
-  authApi: mockAuthApi,
-}));
-
-jest.mock('../services/auth/socialAuth', () => mockSocialAuth);
 
 // Mock MaterialCommunityIcons
 jest.mock('@expo/vector-icons/MaterialCommunityIcons', () => 'MaterialCommunityIcons');
@@ -231,7 +268,7 @@ console.error = jest.fn();
 // Reset all mocks before each test
 beforeEach(() => {
   jest.clearAllMocks();
-  (mockAsyncStorage.clear as jest.Mock).mockClear();
+  mockAsyncStorage.clear.mockClear();
 });
 
 // Mock theme provider
@@ -265,8 +302,3 @@ jest.mock('../theme/ThemeProvider', () => ({
     return {};
   },
 }));
-
-// Define types for our async actions
-interface AsyncActionResult<T> extends Promise<T> {
-  unwrap(): Promise<T>;
-} 

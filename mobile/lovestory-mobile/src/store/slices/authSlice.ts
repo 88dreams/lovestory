@@ -87,20 +87,20 @@ export const initialize = createAsyncThunk(
   }
 );
 
-export const loginAsync = createAsyncThunk(
+export const loginAsync = createAsyncThunk<AuthResponse, LoginCredentials>(
   'auth/loginAsync',
   async (credentials: LoginCredentials, { rejectWithValue }) => {
     try {
       const response = await authApi.login(credentials);
       if (!response?.token || !response?.user) {
-        return rejectWithValue('Invalid response from server');
+        return rejectWithValue('Invalid credentials');
       }
       return {
         token: response.token,
         user: transformUser(response.user),
       };
     } catch (error) {
-      return rejectWithValue(error instanceof Error ? error.message : 'Login failed');
+      return rejectWithValue(error instanceof Error ? error.message : 'Invalid credentials');
     }
   }
 );
@@ -123,25 +123,14 @@ export const register = createAsyncThunk(
   }
 );
 
-export const socialAuthAsync = createAsyncThunk(
+export const socialAuthAsync = createAsyncThunk<AuthResponse, SocialAuthPayload>(
   'auth/socialAuthAsync',
-  async (provider: 'google' | 'apple', { rejectWithValue }) => {
+  async ({ token, provider }, { rejectWithValue }) => {
     try {
-      const socialResponse = await (provider === 'google' ? signInWithGoogle() : signInWithApple());
-      
-      if (socialResponse.type === 'error' || !socialResponse.data) {
-        return rejectWithValue(socialResponse.message || `Failed to sign in with ${provider}`);
-      }
-
-      const response = await authApi.socialAuth({
-        token: socialResponse.data.id, // Using id as token since that's what we get from social auth
-        provider,
-      });
-
+      const response = await authApi.socialAuth({ token, provider });
       if (!response?.token || !response?.user) {
-        return rejectWithValue('Invalid response from server');
+        return rejectWithValue(`Failed to sign in with ${provider}`);
       }
-
       return {
         token: response.token,
         user: transformUser(response.user),

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ViewStyle } from 'react-native';
+import { View, ViewStyle, TextStyle } from 'react-native';
 import { useDispatch } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
@@ -77,7 +77,7 @@ interface DividerProps {
 
 const AUTH_TOKEN_KEY = '@auth_token';
 
-const createStyles = (theme: Theme): Record<string, ViewStyle> => ({
+const createStyles = (theme: Theme): Record<string, ViewStyle | TextStyle> => ({
   container: {
     flex: 1,
     padding: theme.spacing.lg,
@@ -118,6 +118,10 @@ const createStyles = (theme: Theme): Record<string, ViewStyle> => ({
     justifyContent: 'center',
     marginTop: theme.spacing.xl,
   },
+  errorText: {
+    color: theme.colors.error[500],
+    marginBottom: theme.spacing.sm,
+  },
 });
 
 export const LoginScreen: React.FC = () => {
@@ -147,7 +151,7 @@ export const LoginScreen: React.FC = () => {
         const response = await authApi.validateToken(token);
         if (response.valid && response.user) {
           await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
-          navigation.navigate('Home' as never);
+          navigation.navigate('Main' as never);
         } else {
           await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
         }
@@ -170,14 +174,19 @@ export const LoginScreen: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const result = await dispatch(loginAsync({ email, password })).unwrap();
-      if (!result?.token) {
-        throw new Error('Invalid response from server');
+      
+      if (!isValidEmail(email) || !isValidPassword(password)) {
+        setError('Please enter valid email and password');
+        return;
       }
-      await AsyncStorage.setItem('@auth_token', result.token);
-      navigation.navigate('Home');
+
+      const result = await dispatch(loginAsync({ email, password })).unwrap();
+      if (result?.token) {
+        await AsyncStorage.setItem('@auth_token', result.token);
+        navigation.navigate('Home' as never);
+      }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to sign in');
+      setError(err instanceof Error ? err.message : 'Invalid credentials');
     } finally {
       setLoading(false);
     }
@@ -187,16 +196,16 @@ export const LoginScreen: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+      
       const token = provider === 'google' 
         ? await signInWithGoogle()
         : await signInWithApple();
       
       const result = await dispatch(socialAuthAsync({ token, provider })).unwrap();
-      if (!result?.token) {
-        throw new Error('Invalid response from server');
+      if (result?.token) {
+        await AsyncStorage.setItem('@auth_token', result.token);
+        navigation.navigate('Home' as never);
       }
-      await AsyncStorage.setItem('@auth_token', result.token);
-      navigation.navigate('Home');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : `Failed to sign in with ${provider}`);
     } finally {
@@ -222,6 +231,11 @@ export const LoginScreen: React.FC = () => {
       </View>
 
       <Form style={styles.form} onSubmit={handleLogin}>
+        {error && (
+          <Body2 testID="error-message" style={styles.errorText}>
+            {error}
+          </Body2>
+        )}
         <Input
           testID="email-input"
           label="Email"
@@ -249,17 +263,10 @@ export const LoginScreen: React.FC = () => {
             />
           }
         />
-        {error && (
-          <>
-            <Spacer size="sm" />
-            <Body2 testID="error-message" style={{ color: theme.colors.error[500] }}>{error}</Body2>
-          </>
-        )}
-        <Spacer size="lg" />
         <Button
           testID="login-button"
           onPress={handleLogin}
-          disabled={loading || !isValidEmail(email) || !isValidPassword(password)}
+          disabled={loading}
           loading={loading}
         >
           Sign In
