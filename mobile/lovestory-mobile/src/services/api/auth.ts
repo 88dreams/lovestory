@@ -1,88 +1,94 @@
-import { API_BASE_URL } from '../../config';
+import { ApiClient } from './client';
+import { AbstractBaseService } from './factory';
+import {
+  AuthResponse,
+  CreateUserRequest,
+  EmailVerificationRequest,
+  LoginCredentials,
+  PasswordResetRequest,
+  PasswordUpdateRequest,
+  User,
+} from '../../types/models';
 
-interface User {
-  id: number;
-  email: string;
-  name?: string;
-  avatar?: string;
-}
+/**
+ * Service for handling authentication-related API requests
+ */
+export class AuthService extends AbstractBaseService<User> {
+  constructor(client: ApiClient) {
+    super(client, '/auth');
+  }
 
-interface AuthResponse {
-  token: string;
-  user: User;
-}
-
-interface TokenValidationResponse {
-  valid: boolean;
-  user?: User;
-}
-
-interface LoginCredentials {
-  email: string;
-  password: string;
-}
-
-interface SocialAuthCredentials {
-  token: string;
-  provider: 'google' | 'apple';
-}
-
-export const authApi = {
+  /**
+   * Login with email and password
+   */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(credentials),
-    });
+    const response = await this.client.post<AuthResponse>(`${this.basePath}/login`, credentials);
+    await this.client.setTokens(response.data.accessToken, response.data.refreshToken);
+    return response.data;
+  }
 
-    if (!response.ok) {
-      throw new Error('Invalid credentials');
+  /**
+   * Register a new user
+   */
+  async register(data: CreateUserRequest): Promise<AuthResponse> {
+    const response = await this.client.post<AuthResponse>(`${this.basePath}/register`, data);
+    await this.client.setTokens(response.data.accessToken, response.data.refreshToken);
+    return response.data;
+  }
+
+  /**
+   * Logout the current user
+   */
+  async logout(): Promise<void> {
+    await this.client.post(`${this.basePath}/logout`);
+    await this.client.clearTokens();
+  }
+
+  /**
+   * Request password reset
+   */
+  async requestPasswordReset(data: PasswordResetRequest): Promise<void> {
+    await this.client.post(`${this.basePath}/password/reset`, data);
+  }
+
+  /**
+   * Update password
+   */
+  async updatePassword(data: PasswordUpdateRequest): Promise<void> {
+    await this.client.post(`${this.basePath}/password/update`, data);
+  }
+
+  /**
+   * Verify email address
+   */
+  async verifyEmail(data: EmailVerificationRequest): Promise<void> {
+    await this.client.post(`${this.basePath}/email/verify`, data);
+  }
+
+  /**
+   * Resend verification email
+   */
+  async resendVerificationEmail(): Promise<void> {
+    await this.client.post(`${this.basePath}/email/verify/resend`);
+  }
+
+  /**
+   * Get current user profile
+   */
+  async getCurrentUser(): Promise<User> {
+    const response = await this.client.get<User>(`${this.basePath}/me`);
+    return response.data;
+  }
+
+  /**
+   * Check if access token is valid
+   */
+  async validateToken(): Promise<boolean> {
+    try {
+      await this.getCurrentUser();
+      return true;
+    } catch (error) {
+      return false;
     }
-
-    return response.json();
-  },
-
-  async socialAuth(credentials: SocialAuthCredentials): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/auth/social`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(credentials),
-    });
-
-    if (!response.ok) {
-      throw new Error('Social authentication failed');
-    }
-
-    return response.json();
-  },
-
-  async validateToken(token: string): Promise<TokenValidationResponse> {
-    const response = await fetch(`${API_BASE_URL}/auth/validate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      return { valid: false };
-    }
-
-    return response.json();
-  },
-
-  async logout(token: string): Promise<void> {
-    await fetch(`${API_BASE_URL}/auth/logout`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-  },
-}; 
+  }
+} 
