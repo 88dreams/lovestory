@@ -96,6 +96,8 @@ LoveStory is a mobile application that enables collaborative storytelling throug
 - Expo
 - React Navigation
 - React Native Camera
+- Redux Toolkit
+- Axios (API Client)
 
 #### Key Features
 1. **Video Recording**
@@ -113,6 +115,18 @@ LoveStory is a mobile application that enables collaborative storytelling throug
    - Segment preview
    - Playback controls
 
+4. **API Integration**
+   - Centralized API client
+   - Request/response interceptors
+   - Error handling middleware
+   - Reusable API hooks
+   - Type-safe responses
+   - Automatic token management
+   - Request retries and timeout handling
+   - Request cancellation
+   - Response caching
+   - Network status handling
+
 ## Data Flow
 
 ### Video Upload Process
@@ -129,6 +143,18 @@ LoveStory is a mobile application that enables collaborative storytelling throug
 3. FFmpeg combines segments
 4. Generated video stored in S3
 5. Database updated with new story
+
+### API Request Flow
+1. Request initiated from component/hook
+2. Request intercepted by middleware
+   - Token injection
+   - Request validation
+   - Error handling setup
+3. Response received and processed
+   - Response validation
+   - Error transformation
+   - Cache management
+4. Data returned to component/hook
 
 ## Security Considerations
 
