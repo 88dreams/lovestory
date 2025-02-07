@@ -185,66 +185,130 @@ GoogleService-Info.plist
 
 ## Testing Infrastructure
 
+### Test Organization
+Tests are organized by type and functionality:
+```
+src/
+├── test/
+│   ├── unit/                 # Unit tests
+│   │   ├── components/       # Component tests
+│   │   └── services/         # Service tests
+│   ├── integration/          # Integration tests
+│   ├── setup/               # Test setup and configuration
+│   │   ├── msw.ts           # Mock Service Worker setup
+│   │   ├── factories.ts     # Test data factories
+│   │   └── jsdom.js         # JSDOM configuration
+│   └── mocks/               # Mock implementations
+│       ├── components/      # Component mocks
+│       ├── navigation/      # Navigation mocks
+│       └── services/        # Service mocks
+```
+
 ### Jest Configuration
-The testing environment is set up using Jest with React Native Testing Library. Key configurations are in:
-- `jest.setup.js`: Global test setup and mocks
-- `src/test/utils.tsx`: Test utilities and wrapper components
-- `src/test/setup.ts`: Mock implementations and state
+```javascript
+// jest.config.js
+module.exports = {
+  preset: 'jest-expo',
+  setupFilesAfterEnv: ['<rootDir>/src/test/setupJest.tsx'],
+  transformIgnorePatterns: [
+    'node_modules/(?!(jest-)?react-native|@react-native|@react-navigation|expo(nent)?|@expo(nent)?/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|@sentry/.*|msw)/',
+  ],
+  collectCoverage: true,
+  coverageThreshold: {
+    global: {
+      statements: 80,
+      branches: 80,
+      functions: 80,
+      lines: 80,
+    },
+    'src/services/api/': {
+      statements: 90,
+      branches: 90,
+      functions: 90,
+      lines: 90,
+    },
+  },
+}
+```
 
 ### Component Testing
-Tests are located alongside their components in `__tests__` directories. Example:
+Tests follow a consistent pattern:
 ```typescript
-// src/screens/auth/__tests__/LoginScreen.test.tsx
-describe('LoginScreen', () => {
-  it('renders correctly with all UI elements')
-  it('handles form input changes')
-  it('handles successful login')
-  it('handles failed login')
-  it('handles social auth')
+describe('ComponentName', () => {
+  // Basic Rendering
+  it('renders correctly with default props');
+  
+  // Interaction Tests
+  it('handles user interactions');
+  
+  // State Tests
+  it('manages state correctly');
+  
+  // Accessibility Tests
+  it('supports accessibility features');
+  
+  // Error States
+  it('handles error conditions');
 });
 ```
 
-### Mock Implementations
-Redux and navigation mocks are configured in `src/test/setup.ts`:
+### API Testing
+API tests use Mock Service Worker (MSW):
 ```typescript
-export const mockDispatch = jest.fn();
-export const mockSelector = jest.fn();
-export const mockNavigate = jest.fn();
+// src/test/setup/msw.ts
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+
+export const handlers = [
+  http.post('*/auth/login', () => {
+    return HttpResponse.json({
+      data: createMockUser(),
+      token: 'mock-token',
+    });
+  }),
+];
+
+export const server = setupServer(...handlers);
 ```
 
-### Theme and Accessibility
-- Theme colors are configured to meet WCAG AA contrast standards
-- Light theme text colors:
-  - primary: #000000
-  - secondary: #3C3C43
-  - disabled: #6B6B6B (4.5:1 ratio)
-  - inverse: #000000
-- Dark theme text colors:
-  - primary: #FFFFFF
-  - secondary: #EBEBF5
-  - disabled: #ADADB0 (4.5:1 ratio)
-  - inverse: #FFFFFF
+### Test Data Factories
+```typescript
+// src/test/setup/factories.ts
+export const createMockUser = (overrides = {}) => ({
+  id: 'user-123',
+  email: 'test@example.com',
+  username: 'testuser',
+  ...overrides,
+});
+```
 
 ### Running Tests
 ```bash
 # Run all tests
 yarn test
 
-# Run specific test file
-yarn test LoginScreen
-
-# Run with verbose output
-yarn test LoginScreen --verbose
+# Run specific component tests
+yarn test src/test/unit/components/Button.test.tsx
 
 # Run with coverage
 yarn test --coverage
+
+# Run in watch mode
+yarn test --watch
 ```
 
-### Known Testing Notes
-- Animated component updates may show act(...) warnings in tests
-- These warnings don't affect test validity or coverage
-- Warnings are from React Native's internal animation system
+### Coverage Requirements
+- Components: 90% coverage
+- Services: 95% coverage
+- Utils: 85% coverage
+- Integration: 75% coverage
+- Overall: 80% coverage
 
-Last Updated: February 1, 2024
+### Known Issues
+- React Navigation testing requires special setup
+- Animated components may show act() warnings
+- MSW requires specific configuration for mobile
+
+Last Updated: March 4, 2024
 
 Note: Keep this file updated as new configuration requirements are added. Do not store actual production values in this file. 

@@ -214,9 +214,21 @@ LoveStory is a mobile application that enables collaborative storytelling throug
 - Consistent naming conventions
 
 ### Testing Strategy
-- Unit tests for services
-- Integration tests for API
-- E2E tests for critical flows
+- Unit tests for services and components
+  * Jest and React Testing Library
+  * MSW for API mocking
+  * Comprehensive component testing
+  * Service layer unit tests
+- Integration tests for API and workflows
+  * Authentication flows
+  * API service integration
+  * State management
+- Coverage thresholds
+  * Components: 90%
+  * Services: 95%
+  * Utils: 85%
+  * Integration: 75%
+  * Overall: 80%
 
 ### Git Workflow
 - Feature branch workflow
@@ -260,4 +272,21 @@ See CONTRIBUTING.md for development setup and guidelines.
 ---
 Last Updated: [Current Date]
 
-Note: This document serves as the primary reference for the technical implementation of LoveStory. It should be updated as the project evolves. 
+Note: This document serves as the primary reference for the technical implementation of LoveStory. It should be updated as the project evolves.
+
+### API Integration
+- Centralized API client
+  * Request/response interceptors
+  * Error handling middleware
+  * Token management
+  * Network status checking
+- Service layer implementation
+  * Base service abstraction
+  * Service factory pattern
+  * Typed responses
+  * Error handling
+- Testing infrastructure
+  * MSW for API mocking
+  * Test data factories
+  * Integration test utilities
+  * Coverage reporting 
