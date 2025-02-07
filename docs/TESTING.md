@@ -189,7 +189,51 @@ export const mockApiError = (code: string, message: string, status = 400) => ({
 
 ## Test Organization
 
-### 1. Service Tests
+### 1. Component Tests
+Each component should have comprehensive test coverage following these categories:
+- Basic rendering and props
+- User interactions
+- State changes
+- Accessibility
+- Style variations
+- Error states
+
+Example (Button component):
+```typescript
+describe('Button Component', () => {
+  // Basic Rendering
+  it('renders correctly with default props');
+  
+  // Interaction Tests
+  it('handles press events');
+  
+  // Loading State
+  it('shows loading indicator and hides text');
+  it('is disabled when loading');
+  
+  // Disabled State
+  it('is non-interactive when disabled');
+  
+  // Variants
+  it('renders primary variant correctly');
+  it('renders secondary variant correctly');
+  it('renders outlined variant correctly');
+  
+  // Sizes
+  it('renders small size correctly');
+  it('renders medium size correctly');
+  it('renders large size correctly');
+  
+  // Accessibility
+  it('supports custom accessibility props');
+  it('uses text as accessibility label when not provided');
+  
+  // Style Customization
+  it('accepts custom style props');
+});
+```
+
+### 2. Service Tests
 Each service should have its own test file with the following sections:
 - Constructor and initialization
 - CRUD operations
@@ -217,14 +261,189 @@ describe('AuthService', () => {
     // Error scenario tests
   });
 });
-```
 
-### 2. Integration Tests
+### 3. Integration Tests
 Focus on service interactions and workflows:
 - Multi-step processes
 - Service dependencies
 - State management
 - Error recovery
+
+## Implementation Guide
+
+### 1. Setting Up MSW
+```bash
+# Install dependencies
+yarn add -D msw
+
+# Initialize MSW
+npx msw init ./public
+```
+
+### 2. Creating Test Data
+1. Identify common data structures
+2. Create factory functions
+3. Allow customization through overrides
+4. Maintain type safety
+
+### 3. Writing Tests
+1. Start with unit tests
+2. Add integration tests
+3. Implement E2E tests for critical paths
+4. Focus on error scenarios
+
+## Best Practices
+
+### 1. Test Organization
+- Group related tests using `describe` blocks
+- Use clear, descriptive test names
+- Follow the Arrange-Act-Assert pattern
+- Keep tests focused and atomic
+
+### 2. Mocking
+- Mock external dependencies
+- Use MSW for API calls
+- Create reusable mock factories
+- Avoid excessive mocking
+
+### 3. Assertions
+- Test both success and failure cases
+- Verify state changes
+- Check error handling
+- Validate side effects
+
+### 4. Code Coverage
+- Aim for high coverage of business logic
+- Focus on critical paths
+- Don't chase 100% coverage blindly
+- Use coverage reports as guidance
+
+## Running Tests
+
+### Commands
+```bash
+# Run all tests
+yarn test
+
+# Run specific test file
+yarn test auth.test.ts
+
+# Run with coverage
+yarn test --coverage
+
+# Run in watch mode
+yarn test --watch
+```
+
+### Coverage Thresholds
+```javascript
+// jest.config.js
+module.exports = {
+  coverageThreshold: {
+    global: {
+      statements: 80,
+      branches: 80,
+      functions: 80,
+      lines: 80,
+    },
+  },
+};
+```
+
+## Continuous Integration
+
+### GitHub Actions Workflow
+```yaml
+name: Tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+      - run: yarn install
+      - run: yarn test
+```
+
+## Next Steps
+
+1. **API Service Testing**
+   - [ ] Set up MSW
+   - [ ] Create test data factories
+   - [ ] Implement API client tests
+   - [ ] Add service-specific tests
+
+2. **Integration Testing**
+   - [ ] Test service interactions
+   - [ ] Verify workflows
+   - [ ] Test error scenarios
+
+3. **E2E Testing**
+   - [ ] Set up E2E framework
+   - [ ] Implement critical path tests
+   - [ ] Add user flow tests
+
+## Notes
+- Keep tests maintainable and readable
+- Focus on business value
+- Regular test maintenance
+- Document complex test scenarios
+
+## Current Status & Priorities
+
+### Completed
+1. **Testing Infrastructure**
+   - Jest and React Testing Library setup
+   - MSW for API mocking
+   - Test coverage reporting
+   - Component test utilities
+
+2. **Component Tests**
+   - Button component (100% coverage)
+   - Login screen
+   - Form validation
+
+3. **Theme Testing**
+   - Theme provider mocks
+   - Color scheme validation
+   - Accessibility compliance
+
+### In Progress
+1. **API Service Tests**
+   - API client error handling
+   - Auth service implementation
+   - Token management
+   - Request/response interceptors
+
+2. **Integration Tests**
+   - Authentication flows
+   - API error scenarios
+   - State management integration
+
+### Upcoming
+1. **Additional Component Tests**
+   - Input component
+   - Form components
+   - Navigation components
+   - Modal components
+
+2. **E2E Testing**
+   - Critical user flows
+   - Cross-feature interactions
+   - Error recovery paths
+
+3. **Performance Testing**
+   - Load time measurements
+   - Memory usage
+   - Animation performance
+
+### Coverage Goals
+- Components: 90%
+- Services: 95%
+- Utils: 85%
+- Integration: 75%
+- Overall: 80%
 
 ## Implementation Guide
 
