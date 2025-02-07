@@ -1,304 +1,251 @@
-// Import jest first
+// 1. Setup Jest and Testing Library
 import { jest } from '@jest/globals';
-import type { NativeModules } from 'react-native';
 
-// Define all mocks that might be used by other imports
-export const mockAsyncStorage = {
-  getItem: jest.fn(async (key: string): Promise<string | null> => null),
-  setItem: jest.fn(async (key: string, value: string): Promise<void> => {}),
-  removeItem: jest.fn(async (key: string): Promise<void> => {}),
-  clear: jest.fn(async (): Promise<void> => {}),
-};
-
-// Define auth mocks
-export const mockAuthResponse = {
-  token: 'mock-token',
-  user: {
-    id: '1',
-    email: 'test@example.com',
-    name: 'Test User',
-    isEmailVerified: false,
-  }
-};
-
-export const mockAuthApi = {
-  login: jest.fn(async (params: { email: string; password: string }) => {
-    if (params.email === 'test@example.com' && params.password === 'password123') {
-      return mockAuthResponse;
-    }
-    throw new Error('Invalid credentials');
-  }),
-  validateToken: jest.fn(async (token: string) => {
-    if (token === mockAuthResponse.token) {
-      return { valid: true, user: mockAuthResponse.user };
-    }
-    return { valid: false };
-  }),
-  socialAuth: jest.fn(async (params: { token: string; provider: 'google' | 'apple' }) => {
-    if (params.token && params.provider) {
-      return mockAuthResponse;
-    }
-    throw new Error(`Failed to sign in with ${params.provider}`);
-  }),
-};
-
-export const mockSocialAuth = {
-  signInWithGoogle: jest.fn(async () => 'mock-google-token'),
-  signInWithApple: jest.fn(async () => 'mock-apple-token'),
-  isAppleSignInAvailable: jest.fn(async () => true),
-};
-
-export const mockNavigation = {
-  navigate: jest.fn((route: string) => {}),
-  goBack: jest.fn(() => {}),
-};
-
-// Mock AsyncStorage immediately
-jest.mock('@react-native-async-storage/async-storage', () => mockAsyncStorage);
-
-// Mock auth services immediately
-jest.mock('../services/api/auth', () => ({
-  authApi: mockAuthApi,
+// 2. Setup React Native mocks first (before any component mocks)
+jest.unstable_mockModule('react-native', () => ({
+  Platform: {
+    OS: 'ios',
+    select: jest.fn((obj: { ios: unknown; android: unknown }) => obj.ios),
+  },
+  StyleSheet: {
+    create: jest.fn((styles: Record<string, any>) => styles),
+  },
 }));
 
-jest.mock('../services/auth/socialAuth', () => mockSocialAuth);
-
-// Mock React Native's Animated
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
-jest.mock('react-native', () => {
-  const RN = jest.requireActual<typeof import('react-native')>('react-native');
-  if (!RN.NativeModules.PlatformConstants) {
-    RN.NativeModules.PlatformConstants = {};
-  }
-  RN.NativeModules.PlatformConstants.forceTouchAvailable = false;
-  return {
-    Platform: RN.Platform,
-    StyleSheet: RN.StyleSheet,
-    View: RN.View,
-    Text: RN.Text,
-    TouchableOpacity: RN.TouchableOpacity,
-    TextInput: RN.TextInput,
-    Animated: {
-      timing: () => ({
-        start: jest.fn(),
-        reset: jest.fn(),
-        stop: jest.fn(),
-      }),
-      spring: () => ({
-        start: jest.fn(),
-        reset: jest.fn(),
-        stop: jest.fn(),
-      }),
-      Value: jest.fn(() => ({
-        setValue: jest.fn(),
-        setOffset: jest.fn(),
-        flattenOffset: jest.fn(),
-        extractOffset: jest.fn(),
-        addListener: jest.fn(),
-        removeListener: jest.fn(),
-        removeAllListeners: jest.fn(),
-        stopAnimation: jest.fn(),
-        resetAnimation: jest.fn(),
-        interpolate: jest.fn(() => ({
-          __getValue: jest.fn(),
-          interpolate: jest.fn(),
-        })),
-        __getValue: jest.fn(),
-        __attach: jest.fn(),
-        __detach: jest.fn(),
-        __makeNative: jest.fn(),
-        __getNativeTag: jest.fn(),
-        __getNativeConfig: jest.fn(),
-      })),
-      createAnimatedComponent: (component: any) => component,
+// 3. Setup theme mock (needed by components)
+const mockTheme = {
+  colors: {
+    primary: {
+      100: '#007AFF19',
+      200: '#007AFF33',
+      300: '#007AFF4D',
+      400: '#007AFF66',
+      500: '#007AFF',
+      600: '#007AFFB3',
+      700: '#007AFFCC',
+      800: '#007AFFE6',
+      900: '#007AFFFF',
     },
-    NativeModules: RN.NativeModules,
-  };
-});
-
-// Mock react-native settings
-const mockSettings = {
-  get: jest.fn(() => null),
-  set: jest.fn(),
-};
-jest.mock('react-native/Libraries/Settings/Settings', () => mockSettings);
-
-// Mock setImmediate
-(global as any).setImmediate = jest.fn((callback: () => void) => setTimeout(callback, 0));
-
-// Now import other dependencies
-import { configureStore } from '@reduxjs/toolkit';
-import type { Action, ThunkDispatch } from '@reduxjs/toolkit';
-import type * as ReactNavigation from '@react-navigation/native';
-import type * as ReactRedux from 'react-redux';
-import authReducer from '../store/slices/authSlice';
-
-// Import mocks
-import { mockReactNative } from './mocks/react-native';
-import {
-  mockTypography,
-  mockButton,
-  mockInput,
-  mockIcon,
-  mockScreen,
-  mockSpacer,
-  mockForm,
-  mockDivider,
-} from './mocks/components';
-
-// Add type declaration for unwrap
-declare module '@reduxjs/toolkit' {
-  interface ThunkDispatch<State, ExtraThunkArg, BasicAction extends Action, S = State, E = ExtraThunkArg, A extends Action = BasicAction> {
-    <T extends A>(action: T): T;
-    <R>(asyncAction: (dispatch: ThunkDispatch<S, E, A>, getState: () => S, extra: E) => R): R;
-  }
-}
-
-interface AsyncThunkPromise<T> extends Promise<T> {
-  unwrap(): Promise<T>;
-}
-
-type AppDispatch = {
-  <T>(action: T): T extends (...args: any[]) => any ? ReturnType<T> & { unwrap(): Promise<any> } : Promise<T> & { unwrap(): Promise<any> };
-};
-
-// Create test store
-export const createTestStore = (preloadedState = {}) => {
-  return configureStore({
-    reducer: { auth: authReducer },
-    preloadedState,
-    middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware({
-        serializableCheck: false,
-      })
-  });
-};
-
-// Mock React Native first
-jest.mock('react-native', () => mockReactNative);
-
-// Then import and configure jest-native
-import '@testing-library/jest-native/extend-expect';
-
-// Mock react-native-safe-area-context
-jest.mock('react-native-safe-area-context', () => ({
-  SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
-  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
-}));
-
-// Silence React Native warnings
-const originalConsoleWarn = console.warn;
-console.warn = (...args: any[]) => {
-  if (typeof args[0] === 'string' && (
-    args[0].startsWith('ProgressBarAndroid has been merged') ||
-    args[0].startsWith('Clipboard has been extracted') ||
-    args[0].startsWith('PushNotificationIOS has been extracted')
-  )) {
-    return;
-  }
-  originalConsoleWarn.apply(console, args);
-};
-
-// Mock navigation
-jest.mock('@react-navigation/native', () => {
-  const actual = jest.requireActual<typeof ReactNavigation>('@react-navigation/native');
-  return {
-    ...actual,
-    useNavigation: () => mockNavigation,
-    NavigationContainer: ({ children }: { children: React.ReactNode }) => children,
-  };
-});
-
-// Mock redux
-jest.mock('react-redux', () => {
-  const actual = jest.requireActual<typeof ReactRedux>('react-redux');
-  return {
-    ...actual,
-    useDispatch: () => {
-      const store = createTestStore();
-      return store.dispatch;
+    secondary: {
+      100: '#5856D619',
+      200: '#5856D633',
+      300: '#5856D64D',
+      400: '#5856D666',
+      500: '#5856D6',
+      600: '#5856D6B3',
+      700: '#5856D6CC',
+      800: '#5856D6E6',
+      900: '#5856D6FF',
     },
-    useSelector: jest.fn((selector: (state: { auth: any }) => any) => selector(createTestStore().getState())),
-  };
-});
+    error: {
+      100: '#FF3B3019',
+      200: '#FF3B3033',
+      300: '#FF3B304D',
+      400: '#FF3B3066',
+      500: '#FF3B30',
+      600: '#FF3B30B3',
+      700: '#FF3B30CC',
+      800: '#FF3B30E6',
+      900: '#FF3B30FF',
+    },
+    warning: {
+      100: '#FF950019',
+      200: '#FF950033',
+      300: '#FF95004D',
+      400: '#FF950066',
+      500: '#FF9500',
+      600: '#FF9500B3',
+      700: '#FF9500CC',
+      800: '#FF9500E6',
+      900: '#FF9500FF',
+    },
+    success: {
+      100: '#34C75919',
+      200: '#34C75933',
+      300: '#34C7594D',
+      400: '#34C75966',
+      500: '#34C759',
+      600: '#34C759B3',
+      700: '#34C759CC',
+      800: '#34C759E6',
+      900: '#34C759FF',
+    },
+    info: {
+      100: '#5856D619',
+      200: '#5856D633',
+      300: '#5856D64D',
+      400: '#5856D666',
+      500: '#5856D6',
+      600: '#5856D6B3',
+      700: '#5856D6CC',
+      800: '#5856D6E6',
+      900: '#5856D6FF',
+    },
+    grey: {
+      100: '#8E8E9319',
+      200: '#8E8E9333',
+      300: '#8E8E934D',
+      400: '#8E8E9366',
+      500: '#8E8E93',
+      600: '#8E8E93B3',
+      700: '#8E8E93CC',
+      800: '#8E8E93E6',
+      900: '#8E8E93FF',
+    },
+    background: {
+      primary: '#FFFFFF',
+      secondary: '#F2F2F7',
+      tertiary: '#EFEFF4',
+    },
+    text: {
+      primary: '#000000',
+      secondary: '#3C3C43',
+      disabled: '#6B6B6B',
+      inverse: '#000000',
+    },
+    border: {
+      light: '#E5E5EA',
+      medium: '#C7C7CC',
+      dark: '#8E8E93',
+    },
+    action: {
+      active: '#007AFF',
+      hover: '#47A1FF',
+      disabled: '#99A9BF',
+      disabledBackground: '#F5F7FA',
+    },
+  },
+  spacing: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 },
+  radius: { sm: 4, md: 8, lg: 16 },
+  typography: {
+    button: {
+      fontSize: 16,
+      fontWeight: '600',
+      lineHeight: 24,
+      letterSpacing: 0.5,
+    },
+    h1: {
+      fontSize: 32,
+      fontWeight: 'bold',
+      lineHeight: 40,
+    },
+    h2: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      lineHeight: 32,
+    },
+    body: {
+      fontSize: 16,
+      fontWeight: 'normal',
+      lineHeight: 24,
+    },
+  },
+  shadows: {
+    sm: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.2,
+      shadowRadius: 1.41,
+      elevation: 2,
+    },
+    md: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      elevation: 5,
+    },
+    lg: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4.65,
+      elevation: 8,
+    },
+  },
+};
 
-// Mock components
-jest.mock('../components/common/Typography', () => mockTypography);
-jest.mock('../components/common/Button', () => mockButton);
-jest.mock('../components/common/Input', () => mockInput);
-jest.mock('../components/common/Icon', () => mockIcon);
-jest.mock('../components/common/Screen', () => mockScreen);
-jest.mock('../components/common/Spacer', () => mockSpacer);
-jest.mock('../components/common/form/Form', () => mockForm);
-jest.mock('../components/common/Divider', () => mockDivider);
-
-// Mock MaterialCommunityIcons
-jest.mock('@expo/vector-icons/MaterialCommunityIcons', () => 'MaterialCommunityIcons');
-
-// Mock expo-font
-jest.mock('expo-font', () => ({
-  isLoaded: jest.fn(() => true),
-  loadAsync: jest.fn(() => Promise.resolve()),
-}));
-
-// Mock fetch globally
-global.fetch = jest.fn(() =>
-  Promise.resolve({
-    ok: true,
-    json: () => Promise.resolve({}),
-    status: 200,
-    statusText: 'OK',
-    headers: new Headers(),
-    redirected: false,
-    type: 'basic' as ResponseType,
-    url: '',
-    clone: function() { return this; },
-    body: null,
-    bodyUsed: false,
-    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    blob: () => Promise.resolve(new Blob()),
-    formData: () => Promise.resolve(new FormData()),
-    text: () => Promise.resolve(''),
-  } as Response)
-);
-
-// Mock console.error to avoid noise in tests
-console.error = jest.fn();
-
-// Reset all mocks before each test
-beforeEach(() => {
-  jest.clearAllMocks();
-  mockAsyncStorage.clear.mockClear();
-});
-
-// Mock theme provider
 jest.mock('../theme/ThemeProvider', () => ({
-  useThemedStyles: (fn: any) => {
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
+  useThemedStyles: (fn: (theme: any) => Record<string, any>) => {
     if (typeof fn === 'function') {
-      return fn({
-        colors: {
-          primary: { 500: '#000000' },
-          error: { 500: '#FF0000' },
-          text: { primary: '#000000' },
-          background: { 
-            primary: '#FFFFFF',
-            secondary: '#F5F5F5'
-          },
-        },
-        spacing: {
-          xs: 4,
-          sm: 8,
-          md: 16,
-          lg: 24,
-          xl: 32,
-        },
-        radius: {
-          sm: 4,
-          md: 8,
-          lg: 16,
-        },
-      });
+      return fn(mockTheme);
     }
     return {};
   },
+  useTheme: () => ({
+    theme: mockTheme
+  }),
 }));
+
+// 4. Setup basic service mocks
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(),
+  setItem: jest.fn(),
+  removeItem: jest.fn(),
+  clear: jest.fn(),
+}));
+
+jest.mock('@react-native-community/netinfo', () => ({
+  addEventListener: jest.fn(),
+  fetch: jest.fn(),
+}));
+
+// 5. Setup MSW
+// import { worker } from './setup/msw';
+
+// 6. Global test lifecycle
+// beforeAll(async () => {
+//   await worker.start();
+// });
+
+// afterEach(() => {
+//   worker.resetHandlers();
+//   jest.clearAllMocks();
+// });
+
+// afterAll(async () => {
+//   await worker.stop();
+// });
+
+afterEach(() => {
+  jest.clearAllMocks();
+});
+
+// 7. Error handling
+const originalError = console.error;
+console.error = (...args: any[]) => {
+  if (typeof args[0] === 'string' && args[0].includes('React error')) {
+    throw new Error(args[0]);
+  }
+  originalError.call(console, ...args);
+};
+
+// 8. Global settings
+jest.setTimeout(10000);
+
+// Mock ActivityIndicator component
+jest.mock('react-native/Libraries/Components/ActivityIndicator/ActivityIndicator', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    __esModule: true,
+    default: ({ color, size, ...props }: { color?: string; size?: 'small' | 'large'; [key: string]: any }) => {
+      return React.createElement(View, {
+        ...props,
+        role: 'progressbar',
+        'aria-valuemin': 0,
+        'aria-valuemax': 100,
+        'aria-busy': true,
+        testID: 'activity-indicator',
+        style: {
+          width: size === 'large' ? 36 : 24,
+          height: size === 'large' ? 36 : 24,
+          borderRadius: 18,
+          borderWidth: 2,
+          borderColor: color || '#999999',
+        },
+      });
+    },
+  };
+});
