@@ -453,21 +453,207 @@ interface ApiMetrics {
 ## Testing
 
 ### Test Categories
-1. Unit tests for services
-2. Integration tests for API flows
-3. Error handling tests
-4. Performance tests
-5. Security tests
+1. Unit tests for services ✅
+   - API client tests
+   - Service method tests
+   - Error handling scenarios
+   - Token management
+   - Cache behavior
+
+2. Integration tests for API flows 🚧
+   - Authentication flows
+   - Story creation and management
+   - Video upload process
+   - Template management
+
+3. Error handling tests ✅
+   - Network errors
+   - Authentication failures
+   - Validation errors
+   - Rate limiting
+   - Timeout handling
+
+4. Performance tests 📅
+   - Response times
+   - Concurrent requests
+   - Cache effectiveness
+   - Memory usage
+
+5. Security tests 📅
+   - Token security
+   - Request signing
+   - Data encryption
+   - Access control
 
 ### Test Implementation
 ```typescript
+// Example service test implementation
 describe('ApiClient', () => {
-  it('should handle network errors');
-  it('should retry failed requests');
-  it('should cache responses');
-  it('should handle authentication');
+  beforeEach(() => {
+    server.listen();
+  });
+
+  afterEach(() => {
+    server.resetHandlers();
+  });
+
+  afterAll(() => {
+    server.close();
+  });
+
+  it('should handle network errors', async () => {
+    server.use(
+      http.get('*/api/test', () => {
+        return HttpResponse.error();
+      })
+    );
+
+    await expect(apiClient.get('/test')).rejects.toThrow('Network Error');
+  });
+
+  it('should retry failed requests', async () => {
+    let attempts = 0;
+    server.use(
+      http.get('*/api/test', () => {
+        attempts++;
+        if (attempts < 3) {
+          return HttpResponse.error();
+        }
+        return HttpResponse.json({ success: true });
+      })
+    );
+
+    const response = await apiClient.get('/test');
+    expect(response.data).toEqual({ success: true });
+    expect(attempts).toBe(3);
+  });
+
+  it('should cache responses', async () => {
+    const mockData = { id: 1, name: 'Test' };
+    server.use(
+      http.get('*/api/test', () => {
+        return HttpResponse.json(mockData);
+      })
+    );
+
+    const response1 = await apiClient.get('/test');
+    const response2 = await apiClient.get('/test');
+
+    expect(response1.data).toEqual(mockData);
+    expect(response2.data).toEqual(mockData);
+    // Verify it came from cache
+    expect(server.events.length).toBe(1);
+  });
+
+  it('should handle authentication', async () => {
+    const mockToken = 'test-token';
+    server.use(
+      http.get('*/api/auth', ({ request }) => {
+        const auth = request.headers.get('Authorization');
+        if (auth !== `Bearer ${mockToken}`) {
+          return new HttpResponse(null, { status: 401 });
+        }
+        return HttpResponse.json({ authenticated: true });
+      })
+    );
+
+    apiClient.setToken(mockToken);
+    const response = await apiClient.get('/auth');
+    expect(response.data).toEqual({ authenticated: true });
+  });
 });
+
+## React Hooks Layer
+
+### API Hooks
+Each service has corresponding React hooks for easy integration:
+
+```typescript
+// Example hook implementation
+export const useAuth = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  
+  const login = async (credentials: LoginCredentials) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await authService.login(credentials);
+      return response;
+    } catch (err) {
+      setError(err as ApiError);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return {
+    isLoading,
+    error,
+    login,
+    // ... other auth methods
+  };
+};
 ```
+
+### Hook Features
+- Loading state management
+- Error handling
+- Automatic retries
+- Cache integration
+- Optimistic updates
+- Request cancellation
+- Offline support
+
+## Monitoring & Analytics
+
+### Request Tracking
+```typescript
+interface RequestMetrics {
+  endpoint: string;
+  method: string;
+  duration: number;
+  status: number;
+  timestamp: string;
+  cached: boolean;
+  retries: number;
+}
+
+class MetricsCollector {
+  private metrics: RequestMetrics[] = [];
+
+  trackRequest(metric: RequestMetrics) {
+    this.metrics.push(metric);
+    // Send to analytics service
+  }
+
+  getAverageResponseTime(endpoint: string): number {
+    const endpointMetrics = this.metrics.filter(m => m.endpoint === endpoint);
+    return endpointMetrics.reduce((acc, m) => acc + m.duration, 0) / endpointMetrics.length;
+  }
+
+  getErrorRate(): number {
+    const totalRequests = this.metrics.length;
+    const errorRequests = this.metrics.filter(m => m.status >= 400).length;
+    return (errorRequests / totalRequests) * 100;
+  }
+}
+```
+
+### Performance Monitoring
+- Response time tracking
+- Error rate monitoring
+- Cache hit ratio
+- Network usage
+- Memory consumption
+
+### Error Tracking
+- Error categorization
+- Stack trace collection
+- User context
+- Device information
+- Network conditions
 
 ## Migration Strategy
 

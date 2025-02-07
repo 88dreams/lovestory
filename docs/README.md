@@ -116,9 +116,69 @@ alembic upgrade head
 
 ### Running Tests
 
+The project uses Jest and React Testing Library for testing. MSW (Mock Service Worker) is used for API mocking.
+
+#### Setup Test Environment
 ```bash
-pytest
+# Install dependencies if not already installed
+yarn install
+
+# Initialize MSW
+yarn msw init public/
 ```
+
+#### Running Tests
+```bash
+# Run all tests
+yarn test
+
+# Run tests in watch mode
+yarn test --watch
+
+# Run specific test file
+yarn test path/to/test.tsx
+
+# Run tests with coverage
+yarn test --coverage
+
+# Run tests for specific component
+yarn test Button.test.tsx
+```
+
+#### Test Organization
+```
+src/
+├── test/
+│   ├── unit/                 # Unit tests
+│   │   ├── components/       # Component tests
+│   │   └── services/         # Service tests
+│   ├── integration/          # Integration tests
+│   ├── setup/               # Test setup and configuration
+│   │   ├── msw.ts           # Mock Service Worker setup
+│   │   ├── factories.ts     # Test data factories
+│   │   └── jsdom.js         # JSDOM configuration
+│   └── mocks/               # Mock implementations
+│       ├── components/      # Component mocks
+│       ├── navigation/      # Navigation mocks
+│       └── services/        # Service mocks
+```
+
+#### Coverage Requirements
+- Components: 90%
+- Services: 95%
+- Utils: 85%
+- Integration: 75%
+- Overall: 80%
+
+Run `yarn test --coverage` to generate a coverage report.
+
+#### Continuous Integration
+Tests are automatically run on:
+- Pull requests
+- Pushes to main branch
+- Release tags
+
+Check `.github/workflows/test.yml` for CI configuration.
 
 ## Contributing
 
