@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiClientConfig, ApiError, ApiErrorCode, ApiErrorResponse, ApiResponse } from '../../types/api/common';
 import { Platform } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
+import { APP_CONFIG } from '../../config/app';
 
 const DEFAULT_CONFIG: ApiClientConfig = {
   baseURL: process.env.API_BASE_URL || 'https://api.lovestory.app/v1',
@@ -23,6 +24,10 @@ interface RetryableRequest extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
 
+interface RequestOptions extends RequestInit {
+  params?: Record<string, string>;
+}
+
 /**
  * API Client for handling HTTP requests with proper error handling,
  * token management, and request/response transformation
@@ -30,6 +35,7 @@ interface RetryableRequest extends InternalAxiosRequestConfig {
 export class ApiClient {
   private instance: AxiosInstance;
   private refreshPromise: Promise<string> | null = null;
+  private baseUrl: string;
 
   constructor(config: Partial<ApiClientConfig> = {}) {
     this.instance = axios.create({
@@ -38,6 +44,7 @@ export class ApiClient {
     });
 
     this.setupInterceptors();
+    this.baseUrl = config.baseURL || DEFAULT_CONFIG.baseURL;
   }
 
   /**
@@ -247,4 +254,6 @@ export class ApiClient {
   async delete<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     return this.instance.delete(url, config);
   }
-} 
+}
+
+export const httpClient = new ApiClient({ baseURL: APP_CONFIG.apiBaseUrl }); 

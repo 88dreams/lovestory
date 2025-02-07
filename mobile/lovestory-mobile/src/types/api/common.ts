@@ -7,22 +7,20 @@
  */
 export interface ApiResponse<T> {
   data: T;
-  status: number;
-  message?: string;
+  error?: {
+    code: ApiErrorCode;
+    message: string;
+  };
 }
 
 /**
  * API error codes enum
  */
 export enum ApiErrorCode {
-  NETWORK_ERROR = 'NETWORK_ERROR',
-  TIMEOUT = 'TIMEOUT',
   UNAUTHORIZED = 'UNAUTHORIZED',
-  FORBIDDEN = 'FORBIDDEN',
   NOT_FOUND = 'NOT_FOUND',
   VALIDATION_ERROR = 'VALIDATION_ERROR',
-  SERVER_ERROR = 'SERVER_ERROR',
-  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
+  INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR',
 }
 
 /**
@@ -75,9 +73,12 @@ export interface PaginationMeta {
 /**
  * Paginated response wrapper
  */
-export interface PaginatedResponse<T> {
-  data: T[];
-  meta: PaginationMeta;
+export interface PaginatedResponse<T> extends ApiResponse<T[]> {
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+  };
 }
 
 /**
