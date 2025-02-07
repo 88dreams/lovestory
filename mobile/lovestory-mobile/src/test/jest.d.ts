@@ -2,6 +2,8 @@ import { expect as jestExpect } from '@jest/globals';
 import type { RenderResult } from '@testing-library/react-native';
 import type { Store } from '@reduxjs/toolkit';
 import '@testing-library/jest-native/extend-expect';
+import type { SetupServer } from 'msw/node';
+import type { ApiErrorCode } from '../types/api/common';
 
 declare global {
   const expect: typeof jestExpect;
@@ -25,6 +27,9 @@ declare global {
       toHaveProp: (prop: string, value?: any) => R;
     }
   }
+
+  // Add MSW server to global
+  var server: SetupServer;
 }
 
 // Extend RenderResult with our custom additions
@@ -71,6 +76,18 @@ export interface TestElement extends HTMLElement {
     editable?: boolean;
     secureTextEntry?: boolean;
   };
+}
+
+// MSW Response Types
+interface ApiSuccessResponse<T> {
+  data: T;
+  status: number;
+}
+
+interface ApiErrorResponse {
+  code: ApiErrorCode;
+  message: string;
+  status: number;
 }
 
 export {}; 

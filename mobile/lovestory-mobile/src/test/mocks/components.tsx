@@ -1,7 +1,6 @@
 import React from 'react';
-import { mockReactNative } from './react-native';
-
-const { View, Text, TouchableOpacity, TextInput } = mockReactNative;
+import { View, Text, TouchableOpacity, TextInput } from 'react-native';
+import type { AccessibilityRole } from 'react-native';
 
 interface TypographyProps {
   children: React.ReactNode;
@@ -75,7 +74,7 @@ export const mockInput = {
         testID={testID}
         editable={editable}
         secureTextEntry={secureTextEntry}
-        accessibilityRole="textbox"
+        accessibilityRole="none"
         accessibilityLabel={label}
         {...props}
       />
@@ -136,11 +135,8 @@ export const mockForm = {
       ref={ref} 
       testID={testID} 
       style={style} 
-      accessibilityRole="form"
-      onSubmit={(e: any) => {
-        e.preventDefault();
-        onSubmit?.();
-      }}
+      accessibilityRole="none"
+      onTouchEnd={() => onSubmit?.()}
     >
       {children}
     </View>

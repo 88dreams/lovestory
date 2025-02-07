@@ -1,5 +1,4 @@
 import { jest } from '@jest/globals';
-import { mockAuthApi, mockSocialAuth, mockNavigation, mockAsyncStorage, mockAuthResponse } from './auth';
 
 interface Action {
   type?: string;
@@ -26,10 +25,8 @@ export const mockSettings = {
   set: jest.fn(),
 };
 
-export {
-  mockAuthApi,
-  mockSocialAuth,
-  mockNavigation,
-  mockAsyncStorage,
-  mockAuthResponse
+// Navigation mock
+export const mockNavigation = {
+  navigate: jest.fn((route: string) => {}),
+  goBack: jest.fn(() => {}),
 };
